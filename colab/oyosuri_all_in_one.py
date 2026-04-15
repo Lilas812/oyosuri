@@ -2,7 +2,7 @@
 
 XAUUSD × 平均練行足 × 相関付きランダムウォーク（一般化2パラメータ型）
 の全実装と検証テストを 1 ファイルにまとめたもの。Colab のセルに貼り付けて
-そのまま実行できる（numpy / pandas は Colab に同梱済み）。
+そのまま実行できる（numpy / pandas / matplotlib は Colab に同梱済み）。
 
 作成書 §2〜§8 に準拠。構成:
     1. モデル中核 (coin 行列 / Ψ_n 漸化式 / μ_n / V_n / E[S̃_n])
@@ -11,16 +11,31 @@ XAUUSD × 平均練行足 × 相関付きランダムウォーク（一般化2�
     4. 予測器 (§5 step 2 の (a)(b)(c))
     5. 評価指標 (MAE / RMSE / HIT)
     6. 検証テスト (作成書 §6, §8)
-    7. デモ実行
+    7. TradingView CSV ローダー + matplotlib チャート描画
+    8. デモ実行
+
+Colab での典型的な使い方:
+
+    # TradingView で「Export chart data」→ CSV を保存 → Colab にアップロード
+    from google.colab import files
+    up = files.upload()
+    path = next(iter(up))
+    run_on_tradingview(path, B=2.0)        # B はボックス幅（価格単位）
+
+    # 既に pandas DataFrame がある場合はそのまま渡せる
+    run_on_tradingview(df, B=2.0)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Rectangle
 
 
 # ============================================================================
@@ -409,30 +424,305 @@ def run_verification_tests() -> None:
 
 
 # ============================================================================
-# 7. デモ実行
+# 7. TradingView CSV ローダー + matplotlib チャート描画
 # ============================================================================
 
-def run_demo() -> None:
-    """ミニ価格列に対して平均練行足 → 予測 → 評価指標 まで一気通貫で表示."""
-    print("\n=== Demo: 合成価格列での一気通貫実行 ===")
-    prices = [1800, 1802, 1801, 1803, 1805, 1804, 1806, 1807, 1805, 1806]
-    print(f"prices: {prices}")
+_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    "time":  ("time", "date", "datetime", "timestamp"),
+    "Open":  ("open", "o"),
+    "High":  ("high", "h"),
+    "Low":   ("low", "l"),
+    "Close": ("close", "c", "last"),
+}
 
-    bricks, origins = generate_mean_renko(prices, B=1.0)
-    x = walk_from_bricks(bricks)
-    print(f"bricks: {bricks}")
-    print(f"walk x: {x}")
 
-    preds = predict_sequence(x, grid_size=11)
-    print(f"preds : {[round(v, 4) for v in preds]}")
+def load_tradingview_csv(src) -> pd.DataFrame:
+    """TradingView エクスポート CSV / DataFrame を正規化.
 
-    actual = x[1:]  # {x_1, …, x_N}
-    print(f"actual: {actual}")
-    print(
-        f"MAE = {mae(actual, preds):.4f}, "
-        f"RMSE = {rmse(actual, preds):.4f}, "
-        f"HIT = {hit_rate(actual, preds):.4f}"
+    対応入力:
+      - str / pathlib.Path: CSV ファイルのパスまたは URL → pd.read_csv
+      - pd.DataFrame: そのまま使う（コピー）
+
+    列名は大文字小文字を無視して次のエイリアスで解決:
+      time  ← time / date / datetime / timestamp
+      Open  ← open  / O
+      High  ← high  / H
+      Low   ← low   / L
+      Close ← close / C / last
+
+    time が数値なら unix 秒 or ミリ秒を自動判定して DatetimeIndex に
+    変換する。欠損列は Close で埋める。
+
+    Returns
+    -------
+    pd.DataFrame
+        index = DatetimeIndex (time 列が無ければ RangeIndex)
+        columns = ['Open', 'High', 'Low', 'Close']
+    """
+    if isinstance(src, pd.DataFrame):
+        raw = src.copy()
+    else:
+        raw = pd.read_csv(str(src))
+
+    # lower-case → original のマップを作る
+    lower_map = {str(c).strip().lower(): c for c in raw.columns}
+
+    def find(canon_key: str) -> str | None:
+        for alias in _COLUMN_ALIASES[canon_key]:
+            if alias in lower_map:
+                return lower_map[alias]
+        return None
+
+    close_col = find("Close")
+    if close_col is None:
+        raise ValueError(
+            f"close 列が見つかりません (columns={list(raw.columns)})"
+        )
+    close = pd.to_numeric(raw[close_col], errors="coerce")
+
+    open_col = find("Open")
+    high_col = find("High")
+    low_col = find("Low")
+
+    out = pd.DataFrame(
+        {
+            "Open": pd.to_numeric(raw[open_col], errors="coerce") if open_col else close,
+            "High": pd.to_numeric(raw[high_col], errors="coerce") if high_col else close,
+            "Low":  pd.to_numeric(raw[low_col],  errors="coerce") if low_col  else close,
+            "Close": close,
+        }
     )
+    out = out.dropna(subset=["Close"]).reset_index(drop=True)
+
+    time_col = find("time")
+    if time_col is not None:
+        t_raw = raw[time_col].iloc[: len(out)]
+        if pd.api.types.is_numeric_dtype(t_raw):
+            # TradingView は秒もミリ秒もあり得る。1e11 超ならミリ秒と推定。
+            unit = "ms" if float(t_raw.max()) > 1e11 else "s"
+            idx = pd.to_datetime(t_raw, unit=unit, utc=True)
+        else:
+            idx = pd.to_datetime(t_raw, utc=True, errors="coerce")
+        out.index = pd.DatetimeIndex(idx, name="time")
+    return out
+
+
+def plot_tradingview_result(
+    df: pd.DataFrame,
+    bricks: Sequence[int],
+    origins: Sequence[float],
+    x_walk: Sequence[int],
+    preds: Sequence[float],
+    B: float,
+    title: str | None = None,
+):
+    """3 パネルチャートを matplotlib で描画して Figure を返す.
+
+    Panel 1 : 元の終値ライン + 平均練行足ブリックの box 重ね描き
+    Panel 2 : 整数ウォーク x_n (観測) と予測 x_n* (モデル) の折れ線
+    Panel 3 : ステップ誤差 x_n - x_n* 棒グラフ (方向一致を色分け)
+    """
+    bricks = list(bricks)
+    origins = list(origins)
+    x_walk = list(x_walk)
+    preds = list(preds)
+    N = len(bricks)
+
+    fig, axes = plt.subplots(
+        3, 1, figsize=(11, 9),
+        gridspec_kw={"height_ratios": [3, 2, 1.2]},
+    )
+    ax_price, ax_walk, ax_err = axes
+
+    # ---- Panel 1: 元の終値 + 練行足ブリック -----------------------------
+    if title:
+        ax_price.set_title(title)
+    else:
+        ax_price.set_title(f"Price & Mean Renko bricks (B={B})")
+
+    # 終値をブリック番号軸に揃えるため、等間隔インデックス上に再サンプル
+    if len(df) >= 2 and N >= 1:
+        price_x = np.linspace(0, N, num=len(df))
+        ax_price.plot(
+            price_x, df["Close"].to_numpy(),
+            color="#888888", linewidth=0.9, label="Close",
+        )
+
+    for i, (b, o_start) in enumerate(zip(bricks, origins[:-1])):
+        color = "#2ca02c" if b > 0 else "#d62728"  # green/red
+        y_bottom = o_start if b > 0 else o_start - B
+        rect = Rectangle(
+            (i + 0.05, y_bottom), 0.9, B,
+            facecolor=color, edgecolor="black", linewidth=0.4, alpha=0.7,
+        )
+        ax_price.add_patch(rect)
+
+    ax_price.set_xlim(-0.5, max(N, 1) + 0.5)
+    if origins:
+        pad = B * 2
+        ax_price.set_ylim(min(origins) - pad, max(origins) + pad)
+    ax_price.set_ylabel("Price")
+    ax_price.grid(alpha=0.3)
+    ax_price.legend(loc="upper left", fontsize=8)
+
+    # ---- Panel 2: walk x_n と predict x_n* ------------------------------
+    walk_n = np.arange(len(x_walk))
+    ax_walk.step(
+        walk_n, x_walk, where="post",
+        color="#1f77b4", linewidth=1.6, label="x_n (observed)",
+    )
+    if preds:
+        pred_n = np.arange(1, 1 + len(preds))
+        ax_walk.plot(
+            pred_n, preds,
+            color="#ff7f0e", linewidth=1.4, marker="o", markersize=3,
+            label="x_n* (predicted)",
+        )
+    actual = x_walk[1:]
+    if preds and actual:
+        m = mae(actual, preds)
+        r = rmse(actual, preds)
+        h = hit_rate(actual, preds)
+        ax_walk.set_title(
+            f"Integer walk vs prediction   MAE={m:.3f}  RMSE={r:.3f}  HIT={h:.3f}"
+        )
+    else:
+        ax_walk.set_title("Integer walk vs prediction")
+    ax_walk.set_ylabel("x_n  (box units)")
+    ax_walk.grid(alpha=0.3)
+    ax_walk.legend(loc="upper left", fontsize=8)
+    ax_walk.set_xlim(-0.5, max(N, 1) + 0.5)
+
+    # ---- Panel 3: ステップ誤差 -----------------------------------------
+    if preds and len(x_walk) >= 2:
+        actual_arr = np.asarray(x_walk[1:], dtype=float)
+        pred_arr = np.asarray(preds, dtype=float)
+        err = actual_arr - pred_arr
+        step_n = np.arange(1, 1 + len(err))
+        prev = np.asarray(x_walk[:-1], dtype=float)
+        hit_mask = np.sign(actual_arr - prev) == np.sign(pred_arr - prev)
+        colors = np.where(hit_mask, "#1f77b4", "#d62728")
+        ax_err.bar(step_n, err, color=colors, width=0.8)
+    ax_err.axhline(0.0, color="black", linewidth=0.6)
+    ax_err.set_xlim(-0.5, max(N, 1) + 0.5)
+    ax_err.set_ylabel("x_n − x_n*")
+    ax_err.set_xlabel("brick index n")
+    ax_err.set_title("Step error (blue=direction hit, red=miss)")
+    ax_err.grid(alpha=0.3)
+
+    fig.tight_layout()
+    return fig
+
+
+def run_on_tradingview(
+    src,
+    B: float,
+    *,
+    grid_size: int = 11,
+    symmetric: bool = False,
+    title: str | None = None,
+    show: bool = True,
+):
+    """TradingView CSV / DataFrame 入力 → 練行足 → 予測 → チャート描画.
+
+    Parameters
+    ----------
+    src :
+        CSV ファイルのパス, URL, または pandas DataFrame.
+    B :
+        平均練行足のボックス幅（価格単位）。
+    grid_size :
+        V_n 最小化の 1 軸あたりグリッド点数。11 で十分な場合が多い。
+    symmetric :
+        True なら教科書互換の q=p 制約モード。
+    title :
+        Panel 1 のタイトル上書き。
+    show :
+        True なら plt.show() を呼ぶ（Colab では return された figure が
+        暗黙表示されるのでどちらでも可）。
+
+    Returns
+    -------
+    (fig, result_dict)
+        fig: matplotlib Figure
+        result_dict: {"bricks", "origins", "x", "preds", "mae", "rmse", "hit"}
+    """
+    df = load_tradingview_csv(src)
+    bricks, origins = generate_mean_renko_from_ohlc(df, B=B)
+    x = walk_from_bricks(bricks)
+    preds = predict_sequence(x, grid_size=grid_size, symmetric=symmetric)
+
+    actual = x[1:]
+    m = mae(actual, preds) if preds else 0.0
+    r = rmse(actual, preds) if preds else 0.0
+    h = hit_rate(actual, preds) if preds else 0.0
+    print(
+        f"N_bricks={len(bricks)}  "
+        f"MAE={m:.4f}  RMSE={r:.4f}  HIT={h:.4f}"
+    )
+
+    fig = plot_tradingview_result(
+        df, bricks, origins, x, preds, B=B, title=title
+    )
+    if show:
+        plt.show()
+    return fig, {
+        "bricks": bricks,
+        "origins": origins,
+        "x": x,
+        "preds": preds,
+        "mae": m, "rmse": r, "hit": h,
+    }
+
+
+# ============================================================================
+# 8. デモ実行
+# ============================================================================
+
+def _make_synthetic_xauusd(n_bars: int = 120, seed: int = 0) -> pd.DataFrame:
+    """ダミー XAUUSD OHLC を生成 (ランダムウォーク + ちょいトレンド)."""
+    rng = np.random.default_rng(seed)
+    base = 1800.0
+    closes = [base]
+    for _ in range(n_bars - 1):
+        closes.append(closes[-1] + rng.normal(0.05, 0.8))
+    closes_arr = np.asarray(closes)
+    highs = closes_arr + rng.uniform(0.1, 1.0, size=n_bars)
+    lows = closes_arr - rng.uniform(0.1, 1.0, size=n_bars)
+    opens = np.concatenate([[closes_arr[0]], closes_arr[:-1]])
+    idx = pd.date_range("2024-01-01", periods=n_bars, freq="h", tz="UTC")
+    return pd.DataFrame(
+        {"Open": opens, "High": highs, "Low": lows, "Close": closes_arr},
+        index=idx,
+    )
+
+
+def run_demo() -> None:
+    """合成 XAUUSD OHLC を TradingView 相当の DataFrame として流し、
+    チャートを描画するデモ."""
+    print("\n=== Demo: 合成 XAUUSD OHLC での一気通貫実行 ===")
+    print(
+        "# Colab で実データを使う場合:\n"
+        "#   from google.colab import files\n"
+        "#   up = files.upload()                 # TradingView の CSV を選択\n"
+        "#   path = next(iter(up))\n"
+        "#   run_on_tradingview(path, B=2.0)\n"
+    )
+    df = _make_synthetic_xauusd(n_bars=120, seed=0)
+    print(f"OHLC shape={df.shape}, range {df.index[0]} → {df.index[-1]}")
+    fig, _ = run_on_tradingview(
+        df, B=1.0, grid_size=11,
+        title="Synthetic XAUUSD demo (B=1.0)",
+        show=False,
+    )
+    # Colab ではセル出力に figure が自動表示される。ローカル実行時は
+    # 明示的に savefig したい場合に利用。
+    out_path = Path("/tmp/oyosuri_demo.png")
+    try:
+        fig.savefig(out_path, dpi=110)
+        print(f"(figure saved to {out_path})")
+    except Exception as e:
+        print(f"(figure save skipped: {e})")
 
 
 if __name__ == "__main__":
