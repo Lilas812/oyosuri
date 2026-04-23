@@ -9,10 +9,9 @@ XAUUSD × 平均練行足 × 相関付きランダムウォーク（一般化2�
     2. 平均練行足生成器
     3. V_n 最小化器 ([0,1]^3 グリッド探索)
     4. 予測器 (§5 step 2 の (a)(b)(c))
-    5. 評価指標 (ラン長分布 KS 検定 / ACF 比較)
-    6. 検証テスト (作成書 §6, §8)
-    7. TradingView CSV ローダー + matplotlib チャート描画
-    8. デモ実行
+    5. 検証テスト (作成書 §6, §8)
+    6. TradingView CSV ローダー + matplotlib チャート描画
+    7. デモ実行
 
 Colab での典型的な使い方:
 
@@ -285,145 +284,7 @@ def predict_sequence(
 
 
 # ============================================================================
-# 5. 評価指標 — ラン長分布 KS 検定 / ACF 比較
-# ============================================================================
-# CRW の構造仮定を直接テストする 2 指標:
-#   (A) ラン長 KS 検定: 経験ラン長 vs 幾何分布 Geom(1-p), Geom(1-q)
-#       → 持続性構造 (モデルの妥当性) の goodness-of-fit
-#   (B) ACF 比較: 経験 ACF vs 理論 (p+q-1)^k
-#       → 1 次マルコフ仮定が何 lag まで保つか (モデルの限界)
-# p, q は遷移回数から直接最尤推定 (CRW の MLE).
-
-def estimate_pq_mle(bricks: Sequence[int]) -> tuple[float, float]:
-    """遷移カウントから p, q を最尤推定.
-
-    p = P(b_{i+1}=+1 | b_i=+1),  q = P(b_{i+1}=-1 | b_i=-1).
-    該当遷移がゼロの場合は 0.5 (情報なし) を返す.
-    """
-    arr = np.asarray(list(bricks), dtype=int)
-    if arr.size < 2:
-        return 0.5, 0.5
-    prev = arr[:-1]
-    nxt = arr[1:]
-    n_plus = int(np.sum(prev == 1))
-    n_minus = int(np.sum(prev == -1))
-    n_plus_cont = int(np.sum((prev == 1) & (nxt == 1)))
-    n_minus_cont = int(np.sum((prev == -1) & (nxt == -1)))
-    p_hat = n_plus_cont / n_plus if n_plus > 0 else 0.5
-    q_hat = n_minus_cont / n_minus if n_minus > 0 else 0.5
-    return float(p_hat), float(q_hat)
-
-
-def compute_signed_runs(bricks: Sequence[int]) -> tuple[list[int], list[int]]:
-    """±1 列を走査し, +1 ラン長と -1 ラン長を分離して返す."""
-    runs_plus: list[int] = []
-    runs_minus: list[int] = []
-    bricks_list = list(bricks)
-    if not bricks_list:
-        return runs_plus, runs_minus
-    cur_sign = bricks_list[0]
-    cur_len = 1
-    for b in bricks_list[1:]:
-        if b == cur_sign:
-            cur_len += 1
-        else:
-            (runs_plus if cur_sign == 1 else runs_minus).append(cur_len)
-            cur_sign = b
-            cur_len = 1
-    (runs_plus if cur_sign == 1 else runs_minus).append(cur_len)
-    return runs_plus, runs_minus
-
-
-def _discrete_geom_ks_stat(runs: Sequence[int], param: float) -> float:
-    """離散 KS 統計量 D = sup_k |F_emp(k) - F_geom(k; param)|.
-
-    scipy.stats.kstest は連続分布向けで, 離散分布ではサポート上の
-    ジャンプのせいで D が系統的に膨らむ (真に幾何分布のデータで
-    D ≈ 0.5 になる). ここではサポート {1, 2, ...} 上で CDF を直接
-    比較する正しい離散 KS を実装する.
-    """
-    arr = np.asarray(list(runs), dtype=int)
-    if arr.size == 0:
-        return 0.0
-    param = float(np.clip(param, 1e-6, 1.0 - 1e-6))
-    kmax = int(arr.max())
-    k_vals = np.arange(1, kmax + 1)
-    F_emp = np.array([float(np.mean(arr <= k)) for k in k_vals])
-    F_theo = 1.0 - (1.0 - param) ** k_vals
-    return float(np.max(np.abs(F_emp - F_theo)))
-
-
-def _mc_pvalue_geom_ks(
-    runs: Sequence[int], param: float, *, n_boot: int = 999, seed: int = 0
-) -> float:
-    """H0: Geom(param) からの無作為抽出で D' >= D_obs となる割合 (MC p 値).
-
-    離散 KS は閉じた形の p 値が無いので, 同サイズの擬似データを大量に
-    生成して経験的に p 値を評価する (999 回で十分安定).
-    """
-    arr = np.asarray(list(runs), dtype=int)
-    if arr.size < 2:
-        return 1.0
-    param = float(np.clip(param, 1e-6, 1.0 - 1e-6))
-    D_obs = _discrete_geom_ks_stat(arr, param)
-    rng = np.random.default_rng(seed)
-    count_ge = 0
-    for _ in range(n_boot):
-        synth = rng.geometric(param, size=arr.size)
-        if _discrete_geom_ks_stat(synth, param) >= D_obs:
-            count_ge += 1
-    return float((count_ge + 1) / (n_boot + 1))
-
-
-def run_length_ks_test(
-    bricks: Sequence[int], p_hat: float, q_hat: float
-) -> dict:
-    """ラン長分布の離散 KS 検定.
-
-    +1 ラン長 vs Geom(1-p_hat),  -1 ラン長 vs Geom(1-q_hat).
-    幾何分布 P(L=k) = p^(k-1)(1-p) に対して, scipy 仕様の
-    param = 1 - p (reversal prob) を渡す.
-    """
-    runs_plus, runs_minus = compute_signed_runs(bricks)
-    param_plus = 1.0 - p_hat
-    param_minus = 1.0 - q_hat
-    D_plus = _discrete_geom_ks_stat(runs_plus, param_plus)
-    D_minus = _discrete_geom_ks_stat(runs_minus, param_minus)
-    pval_plus = _mc_pvalue_geom_ks(runs_plus, param_plus)
-    pval_minus = _mc_pvalue_geom_ks(runs_minus, param_minus)
-    return {
-        "D_plus": D_plus, "pval_plus": pval_plus,
-        "D_minus": D_minus, "pval_minus": pval_minus,
-        "runs_plus": runs_plus, "runs_minus": runs_minus,
-    }
-
-
-def empirical_acf(bricks: Sequence[int], max_lag: int) -> np.ndarray:
-    """±1 列の経験自己相関 r_k を k = 0..max_lag で返す."""
-    arr = np.asarray(list(bricks), dtype=float)
-    if arr.size == 0:
-        return np.zeros(max_lag + 1)
-    arr = arr - arr.mean()
-    denom = float(np.dot(arr, arr))
-    acf = np.zeros(max_lag + 1)
-    acf[0] = 1.0
-    if denom <= 0.0:
-        return acf
-    upper = min(max_lag, arr.size - 1)
-    for k in range(1, upper + 1):
-        acf[k] = float(np.dot(arr[:-k], arr[k:]) / denom)
-    return acf
-
-
-def theoretical_acf(p_hat: float, q_hat: float, max_lag: int) -> np.ndarray:
-    """理論 ACF: lambda^k, lambda = p + q - 1 (対称 q=p で (2p-1)^k)."""
-    lam = p_hat + q_hat - 1.0
-    k = np.arange(max_lag + 1)
-    return np.power(lam, k)
-
-
-# ============================================================================
-# 6. 検証テスト — 作成書 §6, §8
+# 5. 検証テスト — 作成書 §6, §8
 # ============================================================================
 
 def _approx(a: float, b: float, tol: float = 1e-12) -> bool:
@@ -532,7 +393,7 @@ def run_verification_tests() -> None:
 
 
 # ============================================================================
-# 7. TradingView CSV ローダー + matplotlib チャート描画
+# 6. TradingView CSV ローダー + matplotlib チャート描画
 # ============================================================================
 
 _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
@@ -622,19 +483,12 @@ def plot_tradingview_result(
     x_walk: Sequence[int],
     preds: Sequence[float],
     B: float,
-    p_hat: float,
-    q_hat: float,
-    ks: dict,
-    emp_acf: np.ndarray,
-    theo_acf: np.ndarray,
     title: str | None = None,
 ):
-    """4 パネルチャートを matplotlib で描画して Figure を返す.
+    """2 パネルチャートを matplotlib で描画して Figure を返す.
 
     Panel 1 : 元の終値ライン + 平均練行足ブリックの box 重ね描き
     Panel 2 : 整数ウォーク x_n (観測) と予測 x_n* (モデル) の折れ線
-    Panel 3 : ラン長分布 — 経験ヒストグラム vs 幾何分布 (符号別 2 サブ軸)
-    Panel 4 : ACF 比較 — 経験 ACF (棒) vs 理論 (p+q-1)^k (ライン)
     """
     bricks = list(bricks)
     origins = list(origins)
@@ -642,15 +496,10 @@ def plot_tradingview_result(
     preds = list(preds)
     N = len(bricks)
 
-    fig = plt.figure(figsize=(11, 12))
-    gs = fig.add_gridspec(
-        4, 2, height_ratios=[3, 2, 2, 2], hspace=0.45, wspace=0.25
+    fig, (ax_price, ax_walk) = plt.subplots(
+        2, 1, figsize=(11, 7),
+        gridspec_kw={"height_ratios": [3, 2]},
     )
-    ax_price = fig.add_subplot(gs[0, :])
-    ax_walk = fig.add_subplot(gs[1, :])
-    ax_run_plus = fig.add_subplot(gs[2, 0])
-    ax_run_minus = fig.add_subplot(gs[2, 1])
-    ax_acf = fig.add_subplot(gs[3, :])
 
     # ---- Panel 1: 元の終値 + 練行足ブリック -----------------------------
     if title:
@@ -702,68 +551,7 @@ def plot_tradingview_result(
     ax_walk.legend(loc="upper left", fontsize=8)
     ax_walk.set_xlim(-0.5, max(N, 1) + 0.5)
 
-    # ---- Panel 3: ラン長分布 (符号別) ----------------------------------
-    def _plot_run_hist(ax, runs, param, color_emp, color_theo, label):
-        ax.set_xlabel("run length L")
-        ax.set_ylabel("probability")
-        ax.grid(alpha=0.3)
-        if len(runs) == 0:
-            ax.set_title(f"{label}: (no runs)")
-            return
-        max_L = max(runs)
-        bins = np.arange(1, max_L + 2) - 0.5
-        ax.hist(
-            runs, bins=bins, density=True,
-            color=color_emp, alpha=0.6, edgecolor="black",
-            label="empirical",
-        )
-        ks_clip = float(np.clip(param, 1e-6, 1.0 - 1e-6))
-        ks_L = np.arange(1, max_L + 1)
-        theo_pmf = (1.0 - ks_clip) ** (ks_L - 1) * ks_clip
-        ax.plot(
-            ks_L, theo_pmf, marker="o", color=color_theo, linewidth=1.5,
-            label=f"Geom(1-param={1-ks_clip:.3f})",
-        )
-        ax.legend(fontsize=8)
-
-    _plot_run_hist(
-        ax_run_plus, ks["runs_plus"], 1.0 - p_hat,
-        color_emp="#2ca02c", color_theo="#0a6b0a", label="+1 runs",
-    )
-    ax_run_plus.set_title(
-        f"+1 run length   KS D={ks['D_plus']:.3f}  p={ks['pval_plus']:.3f}"
-    )
-    _plot_run_hist(
-        ax_run_minus, ks["runs_minus"], 1.0 - q_hat,
-        color_emp="#d62728", color_theo="#7a0f10", label="-1 runs",
-    )
-    ax_run_minus.set_title(
-        f"-1 run length   KS D={ks['D_minus']:.3f}  p={ks['pval_minus']:.3f}"
-    )
-
-    # ---- Panel 4: ACF 比較 ---------------------------------------------
-    max_lag = len(emp_acf) - 1
-    lags = np.arange(max_lag + 1)
-    ax_acf.bar(
-        lags, emp_acf, width=0.75,
-        color="#1f77b4", alpha=0.7, edgecolor="black", linewidth=0.4,
-        label="empirical",
-    )
-    ax_acf.plot(
-        lags, theo_acf, marker="o", color="#ff7f0e", linewidth=1.6,
-        label=f"theoretical  (p+q-1)^k",
-    )
-    ax_acf.axhline(0.0, color="black", linewidth=0.6)
-    ax_acf.set_xlabel("lag k")
-    ax_acf.set_ylabel("ACF")
-    l1 = float(np.sum(np.abs(emp_acf[1:] - theo_acf[1:])))
-    ax_acf.set_title(
-        f"ACF: empirical vs theoretical   "
-        f"p̂={p_hat:.3f}  q̂={q_hat:.3f}  L1(lag1..{max_lag})={l1:.3f}"
-    )
-    ax_acf.grid(alpha=0.3)
-    ax_acf.legend(loc="upper right", fontsize=8)
-
+    fig.tight_layout()
     return fig
 
 
@@ -798,38 +586,17 @@ def run_on_tradingview(
     -------
     (fig, result_dict)
         fig: matplotlib Figure
-        result_dict: {
-            "bricks", "origins", "x", "preds",
-            "p_hat", "q_hat",
-            "ks": {"D_plus", "pval_plus", "D_minus", "pval_minus",
-                   "runs_plus", "runs_minus"},
-            "emp_acf", "theo_acf", "acf_l1",
-        }
+        result_dict: {"bricks", "origins", "x", "preds"}
     """
     df = load_tradingview_csv(src)
     bricks, origins = generate_mean_renko_from_ohlc(df, B=B)
     x = walk_from_bricks(bricks)
     preds = predict_sequence(x, grid_size=grid_size, symmetric=symmetric)
 
-    p_hat, q_hat = estimate_pq_mle(bricks)
-    ks = run_length_ks_test(bricks, p_hat, q_hat)
-    max_lag = min(20, max(len(bricks) - 1, 0))
-    emp_acf = empirical_acf(bricks, max_lag=max_lag)
-    theo_acf = theoretical_acf(p_hat, q_hat, max_lag=max_lag)
-    acf_l1 = float(np.sum(np.abs(emp_acf[1:] - theo_acf[1:]))) if max_lag >= 1 else 0.0
-
-    print(
-        f"N_bricks={len(bricks)}  p_hat={p_hat:.4f}  q_hat={q_hat:.4f}\n"
-        f"RunLen KS:  D_+={ks['D_plus']:.4f} (p={ks['pval_plus']:.4f})   "
-        f"D_-={ks['D_minus']:.4f} (p={ks['pval_minus']:.4f})\n"
-        f"ACF L1 dist (lag 1..{max_lag}): {acf_l1:.4f}"
-    )
+    print(f"N_bricks={len(bricks)}")
 
     fig = plot_tradingview_result(
-        df, bricks, origins, x, preds, B=B,
-        p_hat=p_hat, q_hat=q_hat, ks=ks,
-        emp_acf=emp_acf, theo_acf=theo_acf,
-        title=title,
+        df, bricks, origins, x, preds, B=B, title=title,
     )
     if show:
         plt.show()
@@ -838,17 +605,11 @@ def run_on_tradingview(
         "origins": origins,
         "x": x,
         "preds": preds,
-        "p_hat": p_hat,
-        "q_hat": q_hat,
-        "ks": ks,
-        "emp_acf": emp_acf,
-        "theo_acf": theo_acf,
-        "acf_l1": acf_l1,
     }
 
 
 # ============================================================================
-# 8. デモ実行
+# 7. デモ実行
 # ============================================================================
 
 def _make_synthetic_xauusd(n_bars: int = 120, seed: int = 0) -> pd.DataFrame:
