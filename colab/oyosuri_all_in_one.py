@@ -46,7 +46,6 @@ from typing import Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.patches import Rectangle
 
 
 # ============================================================================
@@ -527,11 +526,10 @@ def plot_tradingview_result(
     B: float,
     title: str | None = None,
 ):
-    """3 パネルチャートを matplotlib で描画して Figure を返す.
+    """2 パネルチャートを matplotlib で描画して Figure を返す.
 
-    Panel 1 : 元の終値ライン + 平均練行足ブリックの box 重ね描き
+    Panel 1 : 元の終値ライン
     Panel 2 : 整数ウォーク x_n (観測) と予測 x_n* (モデル) の折れ線
-    Panel 3 : ステップ誤差 x_n - x_n* 棒グラフ (方向一致を色分け)
     """
     bricks = list(bricks)
     origins = list(origins)
@@ -540,18 +538,17 @@ def plot_tradingview_result(
     N = len(bricks)
 
     fig, axes = plt.subplots(
-        3, 1, figsize=(11, 9),
-        gridspec_kw={"height_ratios": [3, 2, 1.2]},
+        2, 1, figsize=(11, 7),
+        gridspec_kw={"height_ratios": [3, 2]},
     )
-    ax_price, ax_walk, ax_err = axes
+    ax_price, ax_walk = axes
 
-    # ---- Panel 1: 元の終値 + 練行足ブリック -----------------------------
+    # ---- Panel 1: 元の終値 --------------------------------------------
     if title:
         ax_price.set_title(title)
     else:
-        ax_price.set_title(f"Price & Mean Renko bricks (B={B})")
+        ax_price.set_title("Price")
 
-    # 終値をブリック番号軸に揃えるため、等間隔インデックス上に再サンプル
     if len(df) >= 2 and N >= 1:
         price_x = np.linspace(0, N, num=len(df))
         ax_price.plot(
@@ -559,19 +556,7 @@ def plot_tradingview_result(
             color="#888888", linewidth=0.9, label="Close",
         )
 
-    for i, (b, o_start) in enumerate(zip(bricks, origins[:-1])):
-        color = "#2ca02c" if b > 0 else "#d62728"  # green/red
-        y_bottom = o_start if b > 0 else o_start - B
-        rect = Rectangle(
-            (i + 0.05, y_bottom), 0.9, B,
-            facecolor=color, edgecolor="black", linewidth=0.4, alpha=0.7,
-        )
-        ax_price.add_patch(rect)
-
     ax_price.set_xlim(-0.5, max(N, 1) + 0.5)
-    if origins:
-        pad = B * 2
-        ax_price.set_ylim(min(origins) - pad, max(origins) + pad)
     ax_price.set_ylabel("Price")
     ax_price.grid(alpha=0.3)
     ax_price.legend(loc="upper left", fontsize=8)
@@ -589,37 +574,12 @@ def plot_tradingview_result(
             color="#ff7f0e", linewidth=1.4, marker="o", markersize=3,
             label="x_n* (predicted)",
         )
-    actual = x_walk[1:]
-    if preds and actual:
-        m = mae(actual, preds)
-        r = rmse(actual, preds)
-        h = hit_rate(actual, preds)
-        ax_walk.set_title(
-            f"Integer walk vs prediction   MAE={m:.3f}  RMSE={r:.3f}  HIT={h:.3f}"
-        )
-    else:
-        ax_walk.set_title("Integer walk vs prediction")
+    ax_walk.set_title("Integer walk vs prediction")
     ax_walk.set_ylabel("x_n  (box units)")
+    ax_walk.set_xlabel("brick index n")
     ax_walk.grid(alpha=0.3)
     ax_walk.legend(loc="upper left", fontsize=8)
     ax_walk.set_xlim(-0.5, max(N, 1) + 0.5)
-
-    # ---- Panel 3: ステップ誤差 -----------------------------------------
-    if preds and len(x_walk) >= 2:
-        actual_arr = np.asarray(x_walk[1:], dtype=float)
-        pred_arr = np.asarray(preds, dtype=float)
-        err = actual_arr - pred_arr
-        step_n = np.arange(1, 1 + len(err))
-        prev = np.asarray(x_walk[:-1], dtype=float)
-        hit_mask = np.sign(actual_arr - prev) == np.sign(pred_arr - prev)
-        colors = np.where(hit_mask, "#1f77b4", "#d62728")
-        ax_err.bar(step_n, err, color=colors, width=0.8)
-    ax_err.axhline(0.0, color="black", linewidth=0.6)
-    ax_err.set_xlim(-0.5, max(N, 1) + 0.5)
-    ax_err.set_ylabel("x_n − x_n*")
-    ax_err.set_xlabel("brick index n")
-    ax_err.set_title("Step error (blue=direction hit, red=miss)")
-    ax_err.grid(alpha=0.3)
 
     fig.tight_layout()
     return fig
@@ -751,15 +711,7 @@ def run_on_tradingview(
     bricks, origins = generate_mean_renko_from_ohlc(df, B=B)
     x = walk_from_bricks(bricks)
     preds = predict_sequence(x, grid_size=grid_size, symmetric=symmetric)
-
-    actual = x[1:]
-    m = mae(actual, preds) if preds else 0.0
-    r = rmse(actual, preds) if preds else 0.0
-    h = hit_rate(actual, preds) if preds else 0.0
-    print(
-        f"N_bricks={len(bricks)}  "
-        f"MAE={m:.4f}  RMSE={r:.4f}  HIT={h:.4f}"
-    )
+    print(f"N_bricks={len(bricks)}")
 
     fig = plot_tradingview_result(
         df, bricks, origins, x, preds, B=B, title=title
@@ -775,7 +727,6 @@ def run_on_tradingview(
         "origins": origins,
         "x": x,
         "preds": preds,
-        "mae": m, "rmse": r, "hit": h,
         "start": used_start, "end": used_end,
     }
 
