@@ -24,6 +24,12 @@ Colab での典型的な使い方:
 
     # 既に pandas DataFrame がある場合はそのまま渡せる
     run_on_tradingview(df, B=2.0)
+
+    # 当てはめたい時間範囲を限定する場合 (start/end は両端を含む)
+    run_on_tradingview(path, B=2.0,
+                       start="2024-03-01", end="2024-05-31")
+    # index が DatetimeIndex でないときは行番号 (int) でも指定できる
+    run_on_tradingview(df, B=2.0, start=500, end=1500)
 """
 
 from __future__ import annotations
@@ -614,10 +620,56 @@ def plot_tradingview_result(
     return fig
 
 
+def slice_by_time(
+    df: pd.DataFrame,
+    start=None,
+    end=None,
+) -> pd.DataFrame:
+    """DataFrame を [start, end] の範囲に絞り込む.
+
+    - DatetimeIndex の場合: start/end は文字列 ("2024-03-01"),
+      pd.Timestamp, datetime のいずれでも可。tz は index に合わせて自動付与。
+    - それ以外 (RangeIndex 等): start/end は行番号 (int) として扱う。
+    - start/end が None の側はその端まで含む。
+    """
+    if start is None and end is None:
+        return df
+
+    if isinstance(df.index, pd.DatetimeIndex):
+        tz = df.index.tz
+
+        def _conv(v):
+            if v is None:
+                return None
+            ts = pd.Timestamp(v)
+            if tz is not None and ts.tzinfo is None:
+                ts = ts.tz_localize(tz)
+            elif tz is None and ts.tzinfo is not None:
+                ts = ts.tz_convert(None) if hasattr(ts, "tz_convert") else ts.tz_localize(None)
+            return ts
+
+        s = _conv(start)
+        e = _conv(end)
+        out = df.loc[s:e]
+    else:
+        n = len(df)
+        s = 0 if start is None else int(start)
+        e = n if end is None else int(end)
+        out = df.iloc[s:e]
+
+    if out.empty:
+        raise ValueError(
+            f"指定範囲にデータがありません (start={start!r}, end={end!r})"
+        )
+    return out
+
+
 def run_on_tradingview(
     src,
     B: float,
     *,
+    start=None,
+    end=None,
     grid_size: int = 11,
     symmetric: bool = False,
     title: str | None = None,
@@ -631,6 +683,10 @@ def run_on_tradingview(
         CSV ファイルのパス, URL, または pandas DataFrame.
     B :
         平均練行足のボックス幅（価格単位）。
+    start, end :
+        当てはめ対象の時間範囲（両端を含む）。
+        DatetimeIndex なら "2024-03-01" 等の文字列 / pd.Timestamp,
+        通常 index なら行番号 (int) で指定する。None ならその端まで。
     grid_size :
         V_n 最小化の 1 軸あたりグリッド点数。11 で十分な場合が多い。
     symmetric :
@@ -645,9 +701,16 @@ def run_on_tradingview(
     -------
     (fig, result_dict)
         fig: matplotlib Figure
-        result_dict: {"bricks", "origins", "x", "preds", "mae", "rmse", "hit"}
+        result_dict: {"bricks", "origins", "x", "preds", "mae", "rmse", "hit",
+                      "start", "end"}
     """
     df = load_tradingview_csv(src)
+    df = slice_by_time(df, start=start, end=end)
+    if isinstance(df.index, pd.DatetimeIndex) and len(df) > 0:
+        range_str = f"{df.index[0]} → {df.index[-1]}"
+    else:
+        range_str = f"rows [0, {len(df)})"
+    print(f"当てはめ範囲: {range_str}  (bars={len(df)})")
     bricks, origins = generate_mean_renko_from_ohlc(df, B=B)
     x = walk_from_bricks(bricks)
     preds = predict_sequence(x, grid_size=grid_size, symmetric=symmetric)
@@ -666,12 +729,17 @@ def run_on_tradingview(
     )
     if show:
         plt.show()
+    if isinstance(df.index, pd.DatetimeIndex) and len(df) > 0:
+        used_start, used_end = df.index[0], df.index[-1]
+    else:
+        used_start, used_end = 0, len(df)
     return fig, {
         "bricks": bricks,
         "origins": origins,
         "x": x,
         "preds": preds,
         "mae": m, "rmse": r, "hit": h,
+        "start": used_start, "end": used_end,
     }
 
 
