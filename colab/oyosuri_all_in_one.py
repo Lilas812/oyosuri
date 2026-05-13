@@ -28,6 +28,11 @@ Colab での典型的な使い方:
     # 当てはめたい時間範囲を限定する場合 (start/end は両端を含む)
     run_on_tradingview(path, B=2.0,
                        start="2024-03-01", end="2024-05-31")
+    # 日本時間で指定したいとき (TradingView の CSV は UTC なので tz を渡す)
+    run_on_tradingview(path, B=2.0,
+                       start="2026-05-13-00:24",
+                       end="2026-05-13-12:07",
+                       tz="Asia/Tokyo")
     # index が DatetimeIndex でないときは行番号 (int) でも指定できる
     run_on_tradingview(df, B=2.0, start=500, end=1500)
 """
@@ -620,15 +625,36 @@ def plot_tradingview_result(
     return fig
 
 
+import re as _re
+
+_DASH_DT_RE = _re.compile(
+    r"^(\d{4}-\d{1,2}-\d{1,2})[-_T ](\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*$"
+)
+
+
+def _normalize_datetime_str(v):
+    """"2026-05-13-00:24" のような区切りも許容して pandas が読める形に直す."""
+    if isinstance(v, str):
+        m = _DASH_DT_RE.match(v.strip())
+        if m:
+            return f"{m.group(1)} {m.group(2)}"
+    return v
+
+
 def slice_by_time(
     df: pd.DataFrame,
     start=None,
     end=None,
+    tz: str | None = None,
 ) -> pd.DataFrame:
     """DataFrame を [start, end] の範囲に絞り込む.
 
-    - DatetimeIndex の場合: start/end は文字列 ("2024-03-01"),
-      pd.Timestamp, datetime のいずれでも可。tz は index に合わせて自動付与。
+    - DatetimeIndex の場合: start/end は文字列 ("2024-03-01",
+      "2026-05-13 00:24", "2026-05-13-00:24" など) / pd.Timestamp /
+      datetime のいずれでも可。
+    - tz : タイムゾーン名 ("Asia/Tokyo" など)。start/end が tz 情報を
+      持たない文字列のとき、その tz で解釈してから index の tz
+      (TradingView は UTC) に変換する。tz 付き文字列を渡せばそちらが優先。
     - それ以外 (RangeIndex 等): start/end は行番号 (int) として扱う。
     - start/end が None の側はその端まで含む。
     """
@@ -636,16 +662,21 @@ def slice_by_time(
         return df
 
     if isinstance(df.index, pd.DatetimeIndex):
-        tz = df.index.tz
+        idx_tz = df.index.tz
 
         def _conv(v):
             if v is None:
                 return None
-            ts = pd.Timestamp(v)
-            if tz is not None and ts.tzinfo is None:
+            ts = pd.Timestamp(_normalize_datetime_str(v))
+            if ts.tzinfo is None and tz is not None:
                 ts = ts.tz_localize(tz)
-            elif tz is None and ts.tzinfo is not None:
-                ts = ts.tz_convert(None) if hasattr(ts, "tz_convert") else ts.tz_localize(None)
+            if idx_tz is not None:
+                if ts.tzinfo is None:
+                    ts = ts.tz_localize(idx_tz)
+                else:
+                    ts = ts.tz_convert(idx_tz)
+            elif ts.tzinfo is not None:
+                ts = ts.tz_localize(None)
             return ts
 
         s = _conv(start)
@@ -670,6 +701,7 @@ def run_on_tradingview(
     *,
     start=None,
     end=None,
+    tz: str | None = None,
     grid_size: int = 11,
     symmetric: bool = False,
     title: str | None = None,
@@ -685,8 +717,13 @@ def run_on_tradingview(
         平均練行足のボックス幅（価格単位）。
     start, end :
         当てはめ対象の時間範囲（両端を含む）。
-        DatetimeIndex なら "2024-03-01" 等の文字列 / pd.Timestamp,
+        DatetimeIndex なら "2024-03-01", "2026-05-13 00:24",
+        "2026-05-13-00:24" などの文字列 / pd.Timestamp,
         通常 index なら行番号 (int) で指定する。None ならその端まで。
+    tz :
+        start/end を解釈するタイムゾーン (例 "Asia/Tokyo")。
+        TradingView の CSV は UTC なので、日本時間で指定したいときは
+        tz="Asia/Tokyo" を渡せば自動で UTC に変換してから絞り込む。
     grid_size :
         V_n 最小化の 1 軸あたりグリッド点数。11 で十分な場合が多い。
     symmetric :
@@ -705,7 +742,7 @@ def run_on_tradingview(
                       "start", "end"}
     """
     df = load_tradingview_csv(src)
-    df = slice_by_time(df, start=start, end=end)
+    df = slice_by_time(df, start=start, end=end, tz=tz)
     if isinstance(df.index, pd.DatetimeIndex) and len(df) > 0:
         range_str = f"{df.index[0]} → {df.index[-1]}"
     else:
