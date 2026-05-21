@@ -517,6 +517,149 @@ def load_tradingview_csv(src) -> pd.DataFrame:
     return out
 
 
+def predict_sequence_with_params(
+    x_obs: Sequence[int],
+    *,
+    grid_size: int = 21,
+    symmetric: bool = False,
+    tol: float = 1e-10,
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """x_obs = {x_0,…,x_N} から予測列と各ステップの (p*, q*, α*) を返す.
+
+    argmin が複数あるときは各成分を相加平均、V_n が定数のときは NaN.
+    """
+    x_list = list(x_obs)
+    N = len(x_list) - 1
+    preds: list[float] = []
+    ps: list[float] = []
+    qs: list[float] = []
+    alphas: list[float] = []
+    for n in range(N):
+        prefix = x_list[: n + 1]
+        res = minimize_Vn(
+            prefix, grid_size=grid_size, symmetric=symmetric, tol=tol
+        )
+        if res.is_constant:
+            preds.append(float(prefix[-1]))
+            ps.append(float("nan"))
+            qs.append(float("nan"))
+            alphas.append(float("nan"))
+            continue
+        expectations = [
+            expected_position(n + 1, p, q, alpha)
+            for (p, q, alpha) in res.argmins
+        ]
+        preds.append(float(sum(expectations) / len(expectations)))
+        k = len(res.argmins)
+        ps.append(sum(pt[0] for pt in res.argmins) / k)
+        qs.append(sum(pt[1] for pt in res.argmins) / k)
+        alphas.append(sum(pt[2] for pt in res.argmins) / k)
+    return preds, ps, qs, alphas
+
+
+def plot_price(
+    df: pd.DataFrame,
+    N: int,
+    *,
+    title: str | None = None,
+):
+    """元の終値ラインのみを描画した Figure を返す."""
+    fig, ax = plt.subplots(figsize=(13, 5))
+    ax.set_title(title if title else "Price")
+    if len(df) >= 2 and N >= 1:
+        price_x = np.linspace(0, N, num=len(df))
+        ax.plot(
+            price_x, df["Close"].to_numpy(),
+            color="#888888", linewidth=0.9, label="Close",
+        )
+    ax.set_xlim(-0.5, max(N, 1) + 0.5)
+    ax.set_ylabel("Price")
+    ax.set_xlabel("brick index n")
+    ax.grid(alpha=0.3)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8,
+              borderaxespad=0.0)
+    fig.tight_layout()
+    return fig
+
+
+def plot_walk_vs_prediction(
+    x_walk: Sequence[int],
+    preds: Sequence[float],
+):
+    """整数ウォーク x_n と予測 x_n* のみを描画した Figure を返す.
+
+    凡例は軸の外側 (右上) に置き、データと重ならないようにする.
+    """
+    x_walk = list(x_walk)
+    preds = list(preds)
+    N = max(len(x_walk) - 1, 0)
+
+    fig, ax = plt.subplots(figsize=(13, 5))
+    walk_n = np.arange(len(x_walk))
+    ax.step(
+        walk_n, x_walk, where="post",
+        color="#1f77b4", linewidth=1.6, label="x_n (observed)",
+    )
+    if preds:
+        pred_n = np.arange(1, 1 + len(preds))
+        ax.plot(
+            pred_n, preds,
+            color="#ff7f0e", linewidth=1.4, marker="o", markersize=3,
+            label="x_n* (predicted)",
+        )
+    ax.set_title("Integer walk vs prediction")
+    ax.set_ylabel("x_n  (box units)")
+    ax.set_xlabel("brick index n")
+    ax.grid(alpha=0.3)
+    ax.set_xlim(-0.5, max(N, 1) + 0.5)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8,
+              borderaxespad=0.0)
+    fig.tight_layout()
+    return fig
+
+
+def plot_pq(
+    ps: Sequence[float],
+    qs: Sequence[float],
+    *,
+    alphas: Sequence[float] | None = None,
+    symmetric: bool = False,
+):
+    """各ステップの最適化結果 (p*, q*, α*) を描画した Figure を返す."""
+    ps = list(ps)
+    qs = list(qs)
+    M = len(ps)
+    n_axis = np.arange(1, M + 1)
+
+    fig, ax = plt.subplots(figsize=(13, 5))
+    ax.plot(
+        n_axis, ps, color="#2ca02c", linewidth=1.4, marker="o", markersize=3,
+        label="p*",
+    )
+    if symmetric:
+        ax.set_title("Optimal parameter p* (= q*) per step")
+    else:
+        ax.plot(
+            n_axis, qs, color="#d62728", linewidth=1.4, marker="s",
+            markersize=3, label="q*",
+        )
+        ax.set_title("Optimal parameters p*, q* per step")
+    if alphas is not None:
+        ax.plot(
+            n_axis, list(alphas), color="#9467bd", linewidth=1.0,
+            marker="^", markersize=3, linestyle="--", label="α*",
+        )
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlim(0.5, max(M, 1) + 0.5)
+    ax.set_xlabel("brick index n")
+    ax.set_ylabel("parameter value")
+    ax.grid(alpha=0.3)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8,
+              borderaxespad=0.0)
+    fig.tight_layout()
+    return fig
+
+
 def plot_tradingview_result(
     df: pd.DataFrame,
     bricks: Sequence[int],
@@ -525,64 +668,27 @@ def plot_tradingview_result(
     preds: Sequence[float],
     B: float,
     title: str | None = None,
-):
-    """2 パネルチャートを matplotlib で描画して Figure を返す.
+    *,
+    ps: Sequence[float] | None = None,
+    qs: Sequence[float] | None = None,
+    alphas: Sequence[float] | None = None,
+    symmetric: bool = False,
+) -> dict:
+    """価格 / ウォーク vs 予測 / p,q を 3 つの別 Figure として返す.
 
-    Panel 1 : 元の終値ライン
-    Panel 2 : 整数ウォーク x_n (観測) と予測 x_n* (モデル) の折れ線
+    Returns
+    -------
+    dict
+        {"price": Figure, "walk": Figure, "params": Figure or None}
+        ``params`` は ``ps`` / ``qs`` が与えられたときのみ含まれる.
     """
-    bricks = list(bricks)
-    origins = list(origins)
-    x_walk = list(x_walk)
-    preds = list(preds)
-    N = len(bricks)
-
-    fig, axes = plt.subplots(
-        2, 1, figsize=(11, 7),
-        gridspec_kw={"height_ratios": [3, 2]},
-    )
-    ax_price, ax_walk = axes
-
-    # ---- Panel 1: 元の終値 --------------------------------------------
-    if title:
-        ax_price.set_title(title)
-    else:
-        ax_price.set_title("Price")
-
-    if len(df) >= 2 and N >= 1:
-        price_x = np.linspace(0, N, num=len(df))
-        ax_price.plot(
-            price_x, df["Close"].to_numpy(),
-            color="#888888", linewidth=0.9, label="Close",
-        )
-
-    ax_price.set_xlim(-0.5, max(N, 1) + 0.5)
-    ax_price.set_ylabel("Price")
-    ax_price.grid(alpha=0.3)
-    ax_price.legend(loc="upper left", fontsize=8)
-
-    # ---- Panel 2: walk x_n と predict x_n* ------------------------------
-    walk_n = np.arange(len(x_walk))
-    ax_walk.step(
-        walk_n, x_walk, where="post",
-        color="#1f77b4", linewidth=1.6, label="x_n (observed)",
-    )
-    if preds:
-        pred_n = np.arange(1, 1 + len(preds))
-        ax_walk.plot(
-            pred_n, preds,
-            color="#ff7f0e", linewidth=1.4, marker="o", markersize=3,
-            label="x_n* (predicted)",
-        )
-    ax_walk.set_title("Integer walk vs prediction")
-    ax_walk.set_ylabel("x_n  (box units)")
-    ax_walk.set_xlabel("brick index n")
-    ax_walk.grid(alpha=0.3)
-    ax_walk.legend(loc="upper left", fontsize=8)
-    ax_walk.set_xlim(-0.5, max(N, 1) + 0.5)
-
-    fig.tight_layout()
-    return fig
+    N = len(list(bricks))
+    fig_price = plot_price(df, N, title=title)
+    fig_walk = plot_walk_vs_prediction(x_walk, preds)
+    fig_params = None
+    if ps is not None and qs is not None:
+        fig_params = plot_pq(ps, qs, alphas=alphas, symmetric=symmetric)
+    return {"price": fig_price, "walk": fig_walk, "params": fig_params}
 
 
 import re as _re
@@ -696,10 +802,11 @@ def run_on_tradingview(
 
     Returns
     -------
-    (fig, result_dict)
-        fig: matplotlib Figure
-        result_dict: {"bricks", "origins", "x", "preds", "mae", "rmse", "hit",
-                      "start", "end"}
+    (figs, result_dict)
+        figs : dict[str, matplotlib.figure.Figure]
+            {"price", "walk", "params"} の 3 つの Figure.
+        result_dict : {"bricks", "origins", "x", "preds", "ps", "qs",
+                       "alphas", "start", "end"}
     """
     df = load_tradingview_csv(src)
     df = slice_by_time(df, start=start, end=end, tz=tz)
@@ -710,11 +817,14 @@ def run_on_tradingview(
     print(f"当てはめ範囲: {range_str}  (bars={len(df)})")
     bricks, origins = generate_mean_renko_from_ohlc(df, B=B)
     x = walk_from_bricks(bricks)
-    preds = predict_sequence(x, grid_size=grid_size, symmetric=symmetric)
+    preds, ps, qs, alphas = predict_sequence_with_params(
+        x, grid_size=grid_size, symmetric=symmetric
+    )
     print(f"N_bricks={len(bricks)}")
 
-    fig = plot_tradingview_result(
-        df, bricks, origins, x, preds, B=B, title=title
+    figs = plot_tradingview_result(
+        df, bricks, origins, x, preds, B=B, title=title,
+        ps=ps, qs=qs, alphas=alphas, symmetric=symmetric,
     )
     if show:
         plt.show()
@@ -722,11 +832,14 @@ def run_on_tradingview(
         used_start, used_end = df.index[0], df.index[-1]
     else:
         used_start, used_end = 0, len(df)
-    return fig, {
+    return figs, {
         "bricks": bricks,
         "origins": origins,
         "x": x,
         "preds": preds,
+        "ps": ps,
+        "qs": qs,
+        "alphas": alphas,
         "start": used_start, "end": used_end,
     }
 
@@ -766,19 +879,22 @@ def run_demo() -> None:
     )
     df = _make_synthetic_xauusd(n_bars=120, seed=0)
     print(f"OHLC shape={df.shape}, range {df.index[0]} → {df.index[-1]}")
-    fig, _ = run_on_tradingview(
+    figs, _ = run_on_tradingview(
         df, B=1.0, grid_size=11,
         title="Synthetic XAUUSD demo (B=1.0)",
         show=False,
     )
     # Colab ではセル出力に figure が自動表示される。ローカル実行時は
     # 明示的に savefig したい場合に利用。
-    out_path = Path("/tmp/oyosuri_demo.png")
-    try:
-        fig.savefig(out_path, dpi=110)
-        print(f"(figure saved to {out_path})")
-    except Exception as e:
-        print(f"(figure save skipped: {e})")
+    for name, fig in figs.items():
+        if fig is None:
+            continue
+        out_path = Path(f"/tmp/oyosuri_demo_{name}.png")
+        try:
+            fig.savefig(out_path, dpi=110, bbox_inches="tight")
+            print(f"(figure '{name}' saved to {out_path})")
+        except Exception as e:
+            print(f"(figure '{name}' save skipped: {e})")
 
 
 if __name__ == "__main__":
