@@ -149,7 +149,15 @@ def run_on_tradingview_rolling(
     )
     fig_price = plot_price(df, len(bricks), title=price_title)
     fig_walk = plot_walk_vs_prediction(x, preds)
+    fig_walk.axes[0].set_title(
+        f"Integer walk vs prediction (window={window})"
+    )
     fig_params = plot_pq(ps, qs, alphas=alphas, symmetric=symmetric)
+    pq_label = (
+        "Optimal parameter p* (= q*)" if symmetric
+        else "Optimal parameters p*, q*"
+    )
+    fig_params.axes[0].set_title(f"{pq_label} per step (window={window})")
     figs = {"price": fig_price, "walk": fig_walk, "params": fig_params}
 
     if show:
