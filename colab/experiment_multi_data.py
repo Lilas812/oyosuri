@@ -10,8 +10,23 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import numpy as np
 import pandas as pd
+from matplotlib import rcParams
+
+# 日本語フォント (Noto CJK) を登録。無ければ既定フォントのまま。
+for _fp in (
+    "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+):
+    try:
+        fm.fontManager.addfont(_fp)
+        rcParams["font.family"] = fm.FontProperties(fname=_fp).get_name()
+        break
+    except Exception:
+        pass
+rcParams["axes.unicode_minus"] = False
 
 from oyosuri_all_in_one import generate_mean_renko_from_ohlc, walk_from_bricks
 from oyosuri_rolling import predict_sequence_with_params_rolling
