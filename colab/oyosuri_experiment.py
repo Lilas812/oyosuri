@@ -274,7 +274,7 @@ def plot_walk_multi_w(
     if title:
         ax.set_title(title)
     ax.set_xlabel("n")
-    ax.set_ylabel("$x_n$")
+    ax.set_ylabel("$X_n$(ボックス単位)" if jp else "$X_n$ (box units)")
     ax.set_xlim(-0.5, max(N, 1) + 0.5)
     ax.grid(alpha=0.3, linestyle=":")
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9,
