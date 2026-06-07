@@ -14,8 +14,10 @@ MAE は補助（飾り）として併記する。
     windows=["full"]          → 全期間参照の予測1本だけ
     windows=[10, 30, "full"]  → 直近10・直近30・全期間 を重ねる（混在）
 
-論文の白黒印刷でも判別できるよう、実測＝太い黒実線、各系列＝破線/点線/一点鎖線
-＋ ○/□/△ の白抜きマーカーで区別する（色に依存しない）。
+凡例は日本語（実測値／全期間／w=30）で、白黒印刷でも判別できるよう色ではなく
+マーカー形状で区別する（線はすべて実線。実測＝太い黒実線、各系列＝実線＋
+○/□/△ の白抜きマーカー。点線は重なると追えないため実線にした）。日本語フォントが無い環境では英語ラベルに自動
+フォールバックする（□に潰れるのを防ぐ）。
 
 MAE = (1/N) Σ_n |x_n − x_n*|。±1 ウォークなので「動かない予測」の MAE は
 恒等的に 1（MAE<1 で「動かない予測」に優る目安）。
@@ -26,6 +28,9 @@ Colab で GitHub から実行する場合:
     !git clone https://github.com/Lilas812/oyosuri.git
     import sys; sys.path.insert(0, "/content/oyosuri/colab")
 
+    # 1') 凡例の日本語（実測値/全期間）を表示したいとき一度だけ実行
+    !pip install -q matplotlib-fontja
+
     # 2) import（依存は自動解決）
     from oyosuri_experiment import run_multi_w_overlay, run_mae_sweep
 
@@ -33,12 +38,8 @@ Colab で GitHub から実行する場合:
     from google.colab import files
     up = files.upload(); path = next(iter(up))
 
-    # 4a) 3つの W を重ねる
+    # 4a) 3つの W を重ねる / 4b) 全期間参照の予測1本だけ
     fig, r = run_multi_w_overlay(path, B=4, windows=[10, 30, 60],
-                                 start="2026-05-19-15:00", end="2026-05-19-23:58",
-                                 tz="Asia/Tokyo")
-    # 4b) 全期間参照の予測1本だけ
-    fig, r = run_multi_w_overlay(path, B=4, windows=["full"],
                                  start="2026-05-19-15:00", end="2026-05-19-23:58",
                                  tz="Asia/Tokyo")
     fig.savefig("pat_uptrend.png", dpi=150, bbox_inches="tight")  # 論文用に保存
@@ -79,6 +80,41 @@ from oyosuri_rolling import predict_sequence_with_params_rolling
 
 
 _FULL_TOKENS = ("full", "all", "∞", "inf")
+
+
+def _setup_jp_font() -> bool:
+    """凡例の日本語（実測値・全期間 等）を表示できるようフォントを設定する.
+
+    Colab では ``!pip install matplotlib-fontja``（または
+    ``!apt-get -y install fonts-ipafont-gothic`` 後に matplotlib のフォント
+    キャッシュ再構築）を一度実行しておくと日本語が出る。日本語フォントが
+    見つからない場合は False を返し、呼び出し側は英語ラベルにフォール
+    バックする（□で潰れるのを防ぐ）。
+    """
+    import matplotlib
+    from matplotlib import font_manager
+
+    # 1) matplotlib-fontja / japanize-matplotlib が入っていれば使う
+    for _mod in ("matplotlib_fontja", "japanize_matplotlib"):
+        try:
+            __import__(_mod)
+            matplotlib.rcParams["axes.unicode_minus"] = False
+            return True
+        except Exception:
+            pass
+    # 2) システムにある日本語フォントを探して設定
+    candidates = [
+        "Noto Sans CJK JP", "Noto Sans JP", "IPAexGothic", "IPAGothic",
+        "IPAPGothic", "TakaoGothic", "VL Gothic", "Yu Gothic", "Meiryo",
+        "Hiragino Sans", "MS Gothic",
+    ]
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    for name in candidates:
+        if name in available:
+            matplotlib.rcParams["font.family"] = name
+            matplotlib.rcParams["axes.unicode_minus"] = False
+            return True
+    return False
 
 
 def _is_full(W, N: int) -> bool:
@@ -195,11 +231,16 @@ def plot_walk_multi_w(
 ):
     """実測ウォーク x_n と、最大3つの系列の予測 x_n* を同一図に重ねて返す.
 
-    論文の白黒印刷でも判別できるよう、系列は色ではなく「線種＋マーカー形状」で
-    区別する（実測＝太い黒実線・マーカー無し、各系列＝破線/点線/一点鎖線 ＋
-    ○/□/△ の白抜きマーカー）。判断はこの図を目視で行い、凡例に W と
-    （あれば）補助の MAE を併記する。
+    凡例は日本語（実測値／全期間／w=30）。白黒印刷でも判別できるよう、系列は
+    色ではなくマーカー形状で区別する（線はすべて実線。実測＝太い黒実線・
+    マーカー無し、各系列＝実線＋○/□/△ の白抜きマーカー）。判断はこの図を
+    目視で行い、凡例に補助の MAE を併記する。日本語フォントが無ければ英語に
+    自動フォールバックする。
     """
+    jp = _setup_jp_font()
+    obs_label = "実測値" if jp else "observed"
+    full_label = "全期間" if jp else "full"
+
     x = list(x)
     N = max(len(x) - 1, 0)
     fig, ax = plt.subplots(figsize=(13, 5))
@@ -207,32 +248,33 @@ def plot_walk_multi_w(
     walk_n = np.arange(len(x))
     ax.step(
         walk_n, x, where="post",
-        color="black", linewidth=2.2, label="x_n (observed)", zorder=2,
+        color="black", linewidth=2.2, label=obs_label, zorder=2,
     )
 
-    # 白黒で判別するための「線種・マーカー形状」の組（色には依存しない）
-    linestyles = ["--", ":", "-."]
+    # すべて実線。白黒では「マーカー形状＋濃淡」で区別する
+    # （点線は重なると追えないため、線は実線にしてマーカーで識別する）
     markers = ["o", "s", "^"]
-    grays = ["black", "0.45", "black"]
-    me = max(1, N // 15)  # マーカーを間引いて重なりを避ける
+    grays = ["black", "0.50", "black"]
+    me = max(1, N // 18)  # マーカーは追える程度の間隔で配置
     for i, (label, preds) in enumerate(preds_by_w.items()):
         preds = list(preds)
         pred_n = np.arange(1, 1 + len(preds))
-        leg = "full (whole history)" if label == "full" else f"W={label}"
+        leg = full_label if label == "full" else f"w={label}"
         if mae_by_w is not None and label in mae_by_w:
             leg += f"  (MAE={mae_by_w[label]:.3f})"
         ax.plot(
             pred_n, preds,
             color=grays[i % len(grays)],
-            linestyle=linestyles[i % len(linestyles)],
+            linestyle="-",
             marker=markers[i % len(markers)],
-            markersize=5, markerfacecolor="white", markeredgewidth=1.1,
-            markevery=me, linewidth=1.5, label=leg, zorder=3,
+            markersize=6, markerfacecolor="white", markeredgewidth=1.2,
+            markevery=me, linewidth=1.4, label=leg, zorder=3,
         )
 
-    ax.set_title(title or "Observed walk vs prediction")
-    ax.set_xlabel("brick index n")
-    ax.set_ylabel("x_n  (box units)")
+    if title:
+        ax.set_title(title)
+    ax.set_xlabel("n")
+    ax.set_ylabel("$x_n$")
     ax.set_xlim(-0.5, max(N, 1) + 0.5)
     ax.grid(alpha=0.3, linestyle=":")
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9,
