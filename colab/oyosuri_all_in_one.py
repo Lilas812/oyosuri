@@ -316,12 +316,32 @@ def rmse(actual, pred) -> float:
     return 0.0 if a.size == 0 else float(np.sqrt(np.mean((a - p) ** 2)))
 
 
+def mse(actual, pred) -> float:
+    """偏差（予測誤差 x_n − x_n*）の二乗平均 = (1/N)Σ(x_n − x_n*)^2 = rmse^2.
+
+    ±1 ウォークでは no-change 予測 (x_n*=x_{n-1}) の MSE が恒等的に 1 なので、
+    MSE < 1 で初めて方向情報を取れていると言える（= 1 は無情報、> 1 は逆効果）。
+    """
+    a, p = _to_arrays(actual, pred)
+    return 0.0 if a.size == 0 else float(np.mean((a - p) ** 2))
+
+
 def hit_rate(actual, pred) -> float:
     a, p = _to_arrays(actual, pred)
     if a.size < 2:
         return 0.0
     prev = a[:-1]
     return float(np.mean(np.sign(a[1:] - prev) == np.sign(p[1:] - prev)))
+
+
+def mse_skill(actual, pred, baseline=None) -> float:
+    """スキルスコア 1 − MSE_model/MSE_base。
+
+    baseline=None なら ±1 ウォークの no-change 基準 (MSE=1) を使う
+    （このとき skill = 1 − MSE_model）。正でベースラインより良い。
+    """
+    base = 1.0 if baseline is None else mse(actual, baseline)
+    return 0.0 if base == 0.0 else float(1.0 - mse(actual, pred) / base)
 
 
 # ============================================================================
