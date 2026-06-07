@@ -27,6 +27,17 @@ from typing import Sequence
 import matplotlib.pyplot as plt
 import pandas as pd
 
+# このファイルのあるディレクトリ（colab/）を import パスへ追加し、GitHub clone 後に
+# どの作業ディレクトリからでも oyosuri_all_in_one を解決できるようにする。
+import os as _os
+import sys as _sys
+try:
+    _HERE = _os.path.dirname(_os.path.abspath(__file__))
+except NameError:
+    _HERE = _os.getcwd()
+if _HERE not in _sys.path:
+    _sys.path.insert(0, _HERE)
+
 from oyosuri_all_in_one import (
     expected_position,
     generate_mean_renko_from_ohlc,
