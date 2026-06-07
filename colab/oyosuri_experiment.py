@@ -11,22 +11,35 @@
 MAE = (1/N) Σ_n |x_n − x_n*|（既存の ``mae()`` を使用）。±1 ウォークなので
 no-change 予測の MAE は恒等的に 1（MAE<1 で「動かない予測」に優る目安）。
 
-Colab での使い方 (別セルで順に %run):
+Colab で GitHub から実行する場合（推奨）:
 
-    %run colab/oyosuri_all_in_one.py
-    %run colab/oyosuri_rolling.py
-    %run colab/oyosuri_experiment.py
+    # 1) リポジトリを取得して colab/ を import パスに追加
+    !git clone https://github.com/Lilas812/oyosuri.git
+    import sys; sys.path.insert(0, "/content/oyosuri/colab")
 
-    # (1) 数値だけ
+    # 2) 必要な関数を import（依存は自動で解決される）
+    from oyosuri_experiment import run_mae_sweep, run_multi_w_overlay
+    from oyosuri_all_in_one import load_tradingview_csv
+
+    # 3) TradingView の CSV をアップロード
+    from google.colab import files
+    up = files.upload(); path = next(iter(up))
+
+    # (1) 数値だけ（MAE。判断材料の補助）
     res = run_mae_sweep(path, B=4, windows=[2, 3, 5, 10, 20, 40],
                         start="2026-05-19-15:00", end="2026-05-19-23:58",
                         tz="Asia/Tokyo")
 
-    # (2) 最大3つの W を同一グラフに重ねて目視（判断はこの図で）
+    # (2) 最大3つの W を同一グラフに重ねて目視（白黒印刷でも判別できる）
     fig, r = run_multi_w_overlay(path, B=4, windows=[10, 30, 60],
                                  start="2026-05-19-15:00", end="2026-05-19-23:58",
                                  tz="Asia/Tokyo")
+    fig.savefig("pat_uptrend_w.png", dpi=150, bbox_inches="tight")  # 論文用に保存
     # windows に None を入れると全期間版になる（予備実験用: windows=[2, None]）。
+
+（ローカル/旧来の %run 方式でも動く。その場合は
+    %run colab/oyosuri_all_in_one.py → %run colab/oyosuri_rolling.py →
+    %run colab/oyosuri_experiment.py の順に読み込む。）
 """
 
 from __future__ import annotations
@@ -36,6 +49,17 @@ from typing import Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+# このファイルのあるディレクトリ（colab/）を import パスへ追加し、GitHub clone 後に
+# どの作業ディレクトリからでも兄弟モジュール (oyosuri_all_in_one / _rolling) を解決する。
+import os as _os
+import sys as _sys
+try:
+    _HERE = _os.path.dirname(_os.path.abspath(__file__))
+except NameError:  # __file__ が無い実行形態へのフォールバック
+    _HERE = _os.getcwd()
+if _HERE not in _sys.path:
+    _sys.path.insert(0, _HERE)
 
 from oyosuri_all_in_one import (
     generate_mean_renko_from_ohlc,
@@ -159,7 +183,10 @@ def plot_walk_multi_w(
 ):
     """実測ウォーク x_n と、最大3つの W の予測 x_n* を同一図に重ねて返す.
 
-    判断はこの図を目視で行う。凡例には W と（あれば）補助の MAE を併記する。
+    論文の白黒印刷でも判別できるよう、系列は色ではなく「線種＋マーカー形状」で
+    区別する（実測＝太い黒実線・マーカー無し、各 W＝破線/点線/一点鎖線 ＋
+    ○/□/△ の白抜きマーカー）。判断はこの図を目視で行い、凡例に W と
+    （あれば）補助の MAE を併記する。
     """
     x = list(x)
     N = max(len(x) - 1, 0)
@@ -168,11 +195,14 @@ def plot_walk_multi_w(
     walk_n = np.arange(len(x))
     ax.step(
         walk_n, x, where="post",
-        color="#333333", linewidth=1.8, label="x_n (observed)",
+        color="black", linewidth=2.2, label="x_n (observed)", zorder=2,
     )
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    # 白黒印刷で判別するため、色ではなく「線種＋マーカー形状」で区別する。
+    linestyles = ["--", ":", "-."]
     markers = ["o", "s", "^"]
+    grays = ["black", "0.45", "black"]
+    me = max(1, N // 15)  # マーカーを間引いて重なりを避ける
     for i, (label, preds) in enumerate(preds_by_w.items()):
         preds = list(preds)
         pred_n = np.arange(1, 1 + len(preds))
@@ -181,16 +211,19 @@ def plot_walk_multi_w(
             leg += f"  (MAE={mae_by_w[label]:.3f})"
         ax.plot(
             pred_n, preds,
-            color=colors[i % len(colors)], linewidth=1.4,
-            marker=markers[i % len(markers)], markersize=3, label=leg,
+            color=grays[i % len(grays)],
+            linestyle=linestyles[i % len(linestyles)],
+            marker=markers[i % len(markers)],
+            markersize=5, markerfacecolor="white", markeredgewidth=1.1,
+            markevery=me, linewidth=1.5, label=leg, zorder=3,
         )
 
     ax.set_title(title or "Observed walk vs predictions (multiple W)")
     ax.set_xlabel("brick index n")
     ax.set_ylabel("x_n  (box units)")
     ax.set_xlim(-0.5, max(N, 1) + 0.5)
-    ax.grid(alpha=0.3)
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8,
+    ax.grid(alpha=0.3, linestyle=":")
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9,
               borderaxespad=0.0)
     fig.tight_layout()
     return fig
