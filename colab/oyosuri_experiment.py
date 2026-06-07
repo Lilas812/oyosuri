@@ -15,8 +15,8 @@ MAE は補助（飾り）として併記する。
     windows=[10, 30, "full"]  → 直近10・直近30・全期間 を重ねる（混在）
 
 凡例は日本語（実測値／全期間／w=30）で、白黒印刷でも判別できるよう色ではなく
-「線種＋マーカー形状」で区別する（実測＝太い黒実線、各系列＝破線/点線/一点鎖線
-＋ ○/□/△ の白抜きマーカー）。日本語フォントが無い環境では英語ラベルに自動
+マーカー形状で区別する（線はすべて実線。実測＝太い黒実線、各系列＝実線＋
+○/□/△ の白抜きマーカー。点線は重なると追えないため実線にした）。日本語フォントが無い環境では英語ラベルに自動
 フォールバックする（□に潰れるのを防ぐ）。
 
 MAE = (1/N) Σ_n |x_n − x_n*|。±1 ウォークなので「動かない予測」の MAE は
@@ -232,8 +232,8 @@ def plot_walk_multi_w(
     """実測ウォーク x_n と、最大3つの系列の予測 x_n* を同一図に重ねて返す.
 
     凡例は日本語（実測値／全期間／w=30）。白黒印刷でも判別できるよう、系列は
-    色ではなく「線種＋マーカー形状」で区別する（実測＝太い黒実線・マーカー無し、
-    各系列＝破線/点線/一点鎖線 ＋ ○/□/△ の白抜きマーカー）。判断はこの図を
+    色ではなくマーカー形状で区別する（線はすべて実線。実測＝太い黒実線・
+    マーカー無し、各系列＝実線＋○/□/△ の白抜きマーカー）。判断はこの図を
     目視で行い、凡例に補助の MAE を併記する。日本語フォントが無ければ英語に
     自動フォールバックする。
     """
@@ -251,11 +251,11 @@ def plot_walk_multi_w(
         color="black", linewidth=2.2, label=obs_label, zorder=2,
     )
 
-    # 白黒で判別するための「線種・マーカー形状」の組（色には依存しない）
-    linestyles = ["--", ":", "-."]
+    # すべて実線。白黒では「マーカー形状＋濃淡」で区別する
+    # （点線は重なると追えないため、線は実線にしてマーカーで識別する）
     markers = ["o", "s", "^"]
-    grays = ["black", "0.45", "black"]
-    me = max(1, N // 15)  # マーカーを間引いて重なりを避ける
+    grays = ["black", "0.50", "black"]
+    me = max(1, N // 18)  # マーカーは追える程度の間隔で配置
     for i, (label, preds) in enumerate(preds_by_w.items()):
         preds = list(preds)
         pred_n = np.arange(1, 1 + len(preds))
@@ -265,10 +265,10 @@ def plot_walk_multi_w(
         ax.plot(
             pred_n, preds,
             color=grays[i % len(grays)],
-            linestyle=linestyles[i % len(linestyles)],
+            linestyle="-",
             marker=markers[i % len(markers)],
-            markersize=5, markerfacecolor="white", markeredgewidth=1.1,
-            markevery=me, linewidth=1.5, label=leg, zorder=3,
+            markersize=6, markerfacecolor="white", markeredgewidth=1.2,
+            markevery=me, linewidth=1.4, label=leg, zorder=3,
         )
 
     if title:
