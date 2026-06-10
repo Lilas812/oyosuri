@@ -1,0 +1,1187 @@
+\documentclass[a4j,dvipdfmx]{jsarticle}
+
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{amsmath}
+\usepackage{ascmac, fancybox}
+\usepackage{./exp5}
+
+\usepackage{tikz}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{amsthm}
+
+% 定理見出し：名前と文献番号を丸括弧なしで併記するスタイル
+\newtheoremstyle{plainnote}%
+  {}{}%
+  {}%                本文フォント（通常）
+  {}%
+  {\bfseries}%       見出しフォント（太字）
+  {}%               見出し後の句読点（なし）
+  {.5em}%            見出しと本文の空き
+  {\thmname{#1}\thmnumber{ #2}\thmnote{\normalfont\ #3}}% 括弧なしで note を併記
+
+\theoremstyle{plainnote}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{corollary}[theorem]{系}
+
+
+%%
+%  ここから本文
+%%
+\begin{document}
+\section{序論}
+
+\subsection{背景}
+金（Gold）は古くから価値保存手段として扱われ，現代でもインフレや地政学的リスクに応じて価格が変動する重要な資産である。ドル建て金価格は国際的な指標として投資判断やリスク管理に用いられており，その値動きを定量的に捉えるモデル化は実務・学術の両面で関心が高い。
+
+金融時系列を確率過程としてモデル化する枠組みは数多く提案されているが，相関付きランダムウォークモデルは，「直前の値動きの方向」に依存して次の方向を確率的に決めることにより，系列の持続性や反転傾向を少数のパラメータで表現できる点で特徴的である。また，Konno~\cite{ref3} により，量子ウォークに基づく時系列解析のモデルが提案されている。本研究で用いる手法は，このモデルを相関付きランダムウォークに応用して構成した時系列モデルである。
+
+しかし，このような時系列モデルを金価格の値動きに実際に当てはめた先行研究は，筆者の知る限り存在しない。そこで本研究では，相関付きランダムウォークに基づく時系列モデルを金価格の時系列データに適用し，金価格変動の分析における有用性を検討する。
+
+\subsection{目的}
+本研究の目的は，相関付きランダムウォークに基づく時系列モデルが金価格の値動きを記述する上でどの程度妥当であるか，またどのような限界を持つのかを実証的に明らかにすることである。具体的には，まず，XAUUSD（ドル建て金価格）の実価格データを平均練行足を用いて離散化し，一定の値幅ごとの上昇・下降からなる値動きの系列を得る。次に，Konno~\cite{ref3} の量子ウォークによる時系列モデルを相関付きランダムウォークに応用した時系列モデルを，この系列に当てはめて次時刻の値を予測する。さらに，予測値と実測値の平均絶対誤差（MAE）および値動きの方向の一致率（ACC）によって予測性能を定量的に評価する。最後に，これらの結果を踏まえ，本モデルが金価格の値動きを記述する上での妥当性と限界について考察する。
+
+
+\section{確率論}
+
+本章では，以降の議論で用いる確率論の基本概念を整理する。
+具体的には，確率空間，確率変数，および独立同分布の定義を述べる。
+
+%---------------------------------------------------------
+\subsection{確率空間}
+%---------------------------------------------------------
+
+確率現象を数学的に扱うため，以下の三つ組
+\[
+  (\Omega,\mathcal{F},P)
+\]
+を考える。これを\textbf{確率空間}という。各構成要素の意味は次の通りである。
+
+\begin{itemize}
+  \item $\Omega$：起こり得るすべての結果からなる集合。\textbf{標本空間}とよばれ，その要素 $\omega \in \Omega$ を\textbf{標本点}という。
+  \item $\mathcal{F}$：$\Omega$ の部分集合からなる族で，確率を割り当てる対象となる集合の集まり。$\mathcal{F}$ の要素を\textbf{事象}とよぶ。
+  \item $P$：$\mathcal{F}$ から $[0,1]$ への関数で，各事象に確率を対応させる。これを\textbf{確率測度}とよぶ。
+\end{itemize}
+
+事象の族 $\mathcal{F}$ は，$\Omega$ 上の\textbf{$\sigma$-集合体}でなければならない。
+すなわち，以下の三条件を満たす。
+\begin{align}
+  &\Omega\in\mathcal{F}, \label{eq:sigma_omega}\\
+  &A\in\mathcal{F}\text{ ならば }\bar{A}\in\mathcal{F}
+   \quad(\text{ここで }\bar{A}\text{ は }A\text{ の補集合}), \label{eq:sigma_comp}\\
+  &\mathcal{F}\text{ の元からなる列 }(A_n,\,n\geq 1)\text{ に対して，その和集合が }
+   \bigcup_{n=1}^{\infty}A_n\in\mathcal{F}. \label{eq:sigma_union}
+\end{align}
+
+確率測度 $P$ は，以下の三条件を満たす関数として定義される。
+\begin{align}
+  &P(A)\geq 0 \qquad (A\in\mathcal{F}), \label{eq:prob_nonneg}\\
+  &P(\Omega)=1, \label{eq:prob_total}\\
+  &A_1,A_2,\ldots \in \mathcal{F}\text{ が互いに素ならば }
+   P\!\left(\bigcup_{i=1}^{\infty} A_i\right)
+   =\sum_{i=1}^{\infty}P(A_i). \label{eq:prob_sigma_add}
+\end{align}
+
+例えば，1 枚のコインを 1 回投げる試行を考えると，
+標本空間は $\Omega=\{\text{表},\text{裏}\}$，
+事象の集合は $\mathcal{F}=\{\emptyset,\{\text{表}\},\{\text{裏}\},\Omega\}$，
+公平なコインの場合の確率測度は $P(\{\text{表}\})=P(\{\text{裏}\})=1/2$ となる。
+
+%---------------------------------------------------------
+\subsection{確率変数}
+%---------------------------------------------------------
+
+確率空間 $(\Omega,\mathcal{F},P)$ 上で定義された関数
+\[
+  X:\Omega \longrightarrow \mathbb{R}
+\]
+であって，任意の実数 $a$ に対し
+\[
+  \{\omega \in \Omega \mid X(\omega)\leq a\} \in \mathcal{F}
+\]
+を満たすものを\textbf{確率変数}という。
+これは，標本空間の各点 $\omega$ に対して実数値 $X(\omega)$ を対応させる関数であり，
+かつ $X$ の値に関する事象の確率が定まるものである。
+
+確率変数 $X$ の取り得る値が高々可算個であるとき，$X$ を\textbf{離散確率変数}とよぶ。
+本研究で扱う確率変数はすべて離散確率変数である。
+
+確率変数 $X$ に対し，事象 $\{\omega\in\Omega\mid X(\omega)=x\}$ の確率を簡略に
+\[
+  P(X=x)
+\]
+と書く。対応 $x \mapsto P(X=x)$ を $X$ の\textbf{確率分布}という。
+
+%---------------------------------------------------------
+\subsection{独立性と同分布}\label{subsec:iid}
+%---------------------------------------------------------
+
+確率変数列 $X_1,X_2,\ldots,X_n$ が\textbf{独立}であるとは，
+任意の実数 $x_1,x_2,\ldots,x_n$ に対して
+\begin{equation}
+  P(X_1=x_1,\,X_2=x_2,\,\ldots,\,X_n=x_n)
+  =\prod_{k=1}^{n} P(X_k=x_k)
+  \label{eq:independence}
+\end{equation}
+が成立するときをいう。
+直感的には，ある $X_k$ の実現値が他の $X_j$ ($j\neq k$) の確率分布に影響を与えないことを意味する。
+
+また，確率変数 $X_1,X_2,\ldots,X_n$ が\textbf{同分布}であるとは，
+任意の実数 $x$ に対して
+\begin{equation}
+  P(X_1=x)=P(X_2=x)=\cdots=P(X_n=x)
+  \label{eq:identical}
+\end{equation}
+が成立するときをいう。すなわち，すべての $X_k$ が同一の確率分布に従うことを意味する。
+
+確率変数列 $X_1,X_2,\ldots,X_n$ が独立であり，かつ同分布であるとき，
+これを\textbf{独立同分布}（independent and identically distributed，i.i.d.）であるという。
+
+例えば，公平なコインを繰り返し投げ，$k$ 回目に表が出れば $T_k=+1$，
+裏が出れば $T_k=-1$ と定めたとき，
+$\{T_n\}_{n\geq 1}$ は独立同分布な確率変数列となる。
+
+
+
+
+
+\newpage
+\section{ランダムウォークについて}
+\subsection{ランダムウォークの定義}
+%---------------------------------------------------------
+
+確率変数列 $\{T_n\}_{n \geq 1}$ を考え，各 $T_n$ は独立同分布で
+\begin{equation}
+  P(T_n = -1) = p, \quad P(T_n = 1) = q, \qquad (p + q = 1) \label{eq:rv}
+\end{equation}
+を満たすとする。
+これは，\ref{subsec:iid}節の例で導入した公平なコイン投げの列を一般の確率 $p,\,q$ に拡張したものであり，$p = q = 1/2$ の場合が公平なコイン投げに対応する。
+このとき，時刻 $n$ におけるランダムウォークの位置 $S_n$ を
+\begin{equation}
+  S_n = \sum_{k=1}^{n} T_k \label{eq:Sn}
+\end{equation}
+と定義する。ただし初期位置は $S_0 = 0$ とする。
+
+この定義から，$S_n$ は $n$ 回の独立な試行の結果として定まる確率変数である。
+実際，左方向（$T_k = -1$）への移動回数を $\ell$，右方向（$T_k = +1$）への移動回数を $m$ とすると，
+$\ell + m = n$ が成り立ち，このとき位置は
+\begin{equation}
+  x = m - \ell \label{eq:pos}
+\end{equation}
+で表される。
+
+%---------------------------------------------------------
+\subsection{ランダムウォークの確率分布}
+%---------------------------------------------------------
+
+次に，時刻 $n$ における位置 $S_n$ の確率分布 $P(S_n = x)$ を考える。
+$S_n = x$ が成立するためには，左方向への移動回数 $\ell$ と右方向への移動回数 $m$ が
+\begin{equation}
+  m - \ell = x, \qquad \ell + m = n \label{eq:lm}
+\end{equation}
+を満たす必要がある。
+
+$T_n$ が独立であることから，左方向へ $\ell$ 回，右方向へ $m$ 回移動する確率は
+$\binom{n}{\ell} p^\ell q^m$ で与えられる。
+ここで $\binom{n}{k}$ は，$n$ 個のものから順序を考えずに $k$ 個を選ぶ場合の数を表す
+\textbf{二項係数}であり，
+\begin{equation}
+  \binom{n}{k} = {}_n C_k = \frac{n!}{k!\,(n-k)!}
+  \qquad (0\leq k\leq n)
+  \label{eq:binom}
+\end{equation}
+で定義される。すなわち $\binom{n}{k}$ は，高校数学などで用いられる組合せの記号 ${}_n C_k$ と同じものである。
+したがって，事象「$S_n = x$」の確率は
+\begin{equation}
+  P(S_n = x) = \binom{n}{\ell} p^\ell q^m
+  = \frac{n!}{\ell!\,(n-\ell)!}\,p^\ell q^m
+  \label{eq:dist}
+\end{equation}
+で与えられる。ただし $\ell = (n-x)/2$，$m = (n+x)/2$ とする
+（$(n+x)/2$ が非負整数でないとき $P(S_n=x)=0$ とする）。
+
+例えば，時刻 $n = 1$ のときは
+\begin{equation}
+  P(S_1 = -1) = p, \qquad P(S_1 = 1) = q \label{eq:n1}
+\end{equation}
+となる。同様にして時刻 $n = 2$ のときは
+\begin{equation}
+  P(S_2 = -2) = p^2, \qquad P(S_2 = 0) = 2pq, \qquad P(S_2 = 2) = q^2
+  \label{eq:n2}
+\end{equation}
+となる。
+このときの時刻 $n=1,2$ における遷移と確率を
+図\,\ref{fig:rw_transition} に示す。
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{rw_transition}
+  \caption{ランダムウォークの遷移と確率}
+  \label{fig:rw_transition}
+\end{figure}
+
+
+
+さらに，$n = 3$ のときは
+\begin{align}
+  P(S_3 = -3) = \binom{3}{3} p^3 q^0 = p^3, &\qquad
+  P(S_3 = -1) = \binom{3}{2} p^2 q^1 = 3p^2 q, \label{eq:n3a}\\
+  P(S_3 = 1)  = \binom{3}{1} p^1 q^2 = 3pq^2, &\qquad
+  P(S_3 = 3)  = \binom{3}{0} p^0 q^3 = q^3   \label{eq:n3b}
+\end{align}
+となる。
+
+また，対称なランダムウォークの場合は
+\[
+  p=q=\frac{1}{2}
+\]
+である。このときの時刻 $n=1,2,3,4$ における確率分布を
+図\,\ref{fig:rw_barchart} に示す。
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{rw_barchart.png}
+  \caption{対称ランダムウォーク（$p=q=\frac{1}{2}$）における時刻 $n=1,2,3,4$ の確率分布}
+  \label{fig:rw_barchart}
+\end{figure}
+
+%---------------------------------------------------------
+\subsection{ランダムウォークの極限分布}
+%---------------------------------------------------------
+
+本節では，1次元ランダムウォークに関する代表的な極限定理を紹介する。
+まず，以下の\textbf{大数の法則}が成り立つ。
+
+\begin{theorem}[大数の法則~{\cite{ref1}}]
+\label{thm:lln}
+\begin{equation}
+  P\!\left(\lim_{n \to \infty} \frac{S_n}{n} = q - p\right) = 1
+  \label{eq:lln}
+\end{equation}
+が成立する。
+\end{theorem}
+
+さらに，以下の\textbf{中心極限定理}が成り立つ。
+
+\begin{theorem}[中心極限定理~{\cite{ref1}}]
+\label{thm:clt}
+$pq \neq 0$ とする。このとき $-\infty < a < b < \infty$ に対し，
+\begin{equation}
+  \lim_{n \to \infty} P\!\left(a \leq \frac{S_n - (q-p)n}{\sqrt{4pqn}} \leq b\right)
+  = \int_a^b \frac{1}{\sqrt{2\pi}}\,e^{-x^2/2}\,dx
+  \label{eq:clt}
+\end{equation}
+が成立する。
+\end{theorem}
+
+この結果は，極限の確率変数が平均 $0$，分散 $1$ の正規分布に従うことを意味する。
+ここで，確率変数 $S$ が平均 $m$，分散 $v$ の正規分布に従うとは，
+\begin{equation}
+  P(a \leq S \leq b) = \int_a^b \frac{1}{\sqrt{2\pi v}}\,e^{-(x-m)^2/(2v)}\,dx
+  \qquad (a < b)
+  \label{eq:normal_def}
+\end{equation}
+を満たすときをいう。ただし $m$ は実数，$v$ は正の実数である。
+
+一般に，確率変数列 $\{X_1, X_2, X_3, \ldots\}$ と確率変数 $X$ があり，$X_n$ が $X$ に\textbf{弱収束する}とは，任意の $a < b$ に対し
+\begin{equation}
+  \lim_{n \to \infty} P(a \leq X_n \leq b) = P(a \leq X \leq b)
+  \label{eq:weak_conv}
+\end{equation}
+が成立するときをいう。$X_n$ が $X$ に弱収束することを $X_n \Rightarrow X$ と表す。また，このような極限定理を\textbf{弱収束極限定理}という。
+定理\,\ref{thm:clt}より，対称な $p = q = 1/2$ の場合は以下の系が導かれる。
+
+\begin{corollary}
+\label{cor:clt_sym}
+$-\infty < a < b < \infty$ に対し，
+\begin{equation}
+  \lim_{n \to \infty} P\!\left(a \leq \frac{S_n}{\sqrt{n}} \leq b\right)
+  = \int_a^b \frac{1}{\sqrt{2\pi}}\,e^{-x^2/2}\,dx
+  \label{eq:clt_sym}
+\end{equation}
+が成立する。
+\end{corollary}
+
+ランダムウォーク $S_n$ の場合，スケーリングは $S_n/\sqrt{n}$ のように $\sqrt{n}$ で割る形となる。極限の標準正規分布を図示すると図\,\ref{fig:normal} のようになる。
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{normal_limit_distribution}
+  \caption{ランダムウォークの極限測度（標準正規分布）}
+  \label{fig:normal}
+\end{figure}
+\newpage
+
+\section{相関付きランダムウォークについて}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{相関付きランダムウォークの定義}
+
+通常のランダムウォークでは各ステップが独立であるが，
+\textbf{相関付きランダムウォーク}では
+直前の移動方向が次のステップの確率に影響する。
+
+
+パラメータ $a, b, c, d \in (0,1)$，$a + c = b + d = 1$ を固定する。
+各ステップの条件付き確率を
+\begin{align*}
+  P(\text{左} \mid \text{直前：左}) &= a, \quad &
+  P(\text{右} \mid \text{直前：左}) &= c = 1-a, \\
+  P(\text{左} \mid \text{直前：右}) &= b, \quad &
+  P(\text{右} \mid \text{直前：右}) &= d = 1-b
+\end{align*}
+で定める。このとき定まる確率過程 $(\tilde{S}_n)_{n \geq 0}$ を
+\textbf{相関付きランダムウォーク}という。
+
+\subsubsection*{行列による定式化}
+
+内部状態（向き）を，ブラケット記号を用いて
+\[
+  |L\rangle = \begin{pmatrix}1\\0\end{pmatrix} \text{（左向き）}, \qquad
+  |R\rangle = \begin{pmatrix}0\\1\end{pmatrix} \text{（右向き）}
+\]
+と表す。これを用いて，相関付きランダムウォークを $2 \times 2$ 行列で定式化する。
+
+転置推移確率行列を
+\[
+  A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}, \qquad
+  a + c = b + d = 1, \quad 0 < a,\, d < 1
+\]
+で定める。これに対して
+$A|L\rangle = a|L\rangle + c|R\rangle$，
+$A|R\rangle = b|L\rangle + d|R\rangle$
+が成り立つ。
+
+次に，時刻 $n$，位置 $x$ における確率ベクトルを
+\[
+  \Psi_n(x) = \begin{pmatrix} \Psi_n^L(x) \\ \Psi_n^R(x) \end{pmatrix}
+\]
+で表す。ここで $\Psi_n^L(x)$（resp.\ $\Psi_n^R(x)$）は時刻 $n$ に
+左向き（resp.\ 右向き）で位置 $x$ にある確率である。
+正規化条件
+\[
+  \sum_{x \in \mathbb{Z}} \bigl(\Psi_n^L(x) + \Psi_n^R(x)\bigr) = 1
+\]
+を仮定する。
+
+ここで，2次元ベクトル $v = (v_1, v_2)^\top$ に対する1ノルムを
+\begin{equation}
+  \|v\|_1 = |v_1| + |v_2|
+  \label{eq:l1_norm}
+\end{equation}
+で定義する。これは，ベクトルの各成分の絶対値の和である。
+本研究で扱う確率ベクトル $\Psi_n(x)$ の成分は非負であるため，
+$\|\Psi_n(x)\|_1 = \Psi_n^L(x) + \Psi_n^R(x)$ となる。
+これを用いて，時刻 $n$ に位置 $x$ にいる確率を
+\[
+  P(\tilde{S}_n = x) = \Psi_n^L(x) + \Psi_n^R(x) = \|\Psi_n(x)\|_1
+\]
+で定める。
+
+行列 $A$ を左移動成分 $P$ と右移動成分 $Q$ に分解して
+\[
+  P = \begin{pmatrix} a & b \\ 0 & 0 \end{pmatrix}, \qquad
+  Q = \begin{pmatrix} 0 & 0 \\ c & d \end{pmatrix}, \qquad
+  A = P + Q
+\]
+とする。
+$P$ は左向きへの寄与（位置 $x+1$ から $x$ への左向き移動），
+$Q$ は右向きへの寄与（位置 $x-1$ から $x$ への右向き移動）を担う。
+確率ベクトルの時間発展は
+\begin{equation}
+  \Psi_{n+1}(x) = P\,\Psi_n(x+1) + Q\,\Psi_n(x-1)
+  \label{eq:crw_evolution}
+\end{equation}
+で与えられる。
+
+初期確率ベクトルを
+$\varphi = (\alpha,\,\beta)^\top$，$\alpha + \beta = 1$，$\alpha,\beta \geq 0$
+とし，初期状態は原点 $\Psi_0(0) = \varphi$ とする。
+$\alpha = 0$（resp.\ $\beta = 0$）は右向き（resp.\ 左向き）から出発することに対応する。
+
+%---------------------------------------------------------
+\subsection{相関付きランダムウォークの確率分布}
+%---------------------------------------------------------
+
+\subsubsection*{パス和 $\Xi_n(l,m)$}
+
+$n$ ステップで左に $l$ 回，右に $m$ 回（$l + m = n$）移動するとき，
+$l$ 個の $P$（左移動行列）と $m$ 個の $Q$（右移動行列）の積の全順序づけの和を
+$\Xi_n(l, m)$ で表す。
+すなわち，$P$ を $l$ 個，$Q$ を $m$ 個含む長さ $n$ の語全体にわたる行列積の和として
+\begin{equation}
+  \Xi_n(l, m)
+  = \sum_{\substack{(w_1,\ldots,w_n)\in\{P,Q\}^n \\
+        \#\{\,i : w_i = P\,\}=l,\;\#\{\,i : w_i = Q\,\}=m}}
+    w_1 w_2 \cdots w_n
+  \label{eq:path_sum}
+\end{equation}
+で定義する。ここで $\#\{\cdot\}$ は集合の要素数を表す。
+位置と試行回数の関係は $x = m - l$，$l = \dfrac{n-x}{2}$，$m = \dfrac{n+x}{2}$ である。
+
+$n = 2$ の場合は
+\begin{align*}
+  \Xi_2(2,0) &= P^2, \quad \Xi_2(0,2) = Q^2, \\
+  \Xi_2(1,1) &= QP + PQ
+\end{align*}
+となる。
+
+$n = 3$ の場合は
+\begin{align*}
+  \Xi_3(3,0) &= P^3, \quad \Xi_3(0,3) = Q^3, \\
+  \Xi_3(2,1) &= QP^2 + PQP + P^2Q, \\
+  \Xi_3(1,2) &= PQ^2 + QPQ + Q^2P
+\end{align*}
+となる。
+
+ここで，通常のランダムウォークと相関付きランダムウォークの確率分布の構造的な違いを述べる。
+通常のランダムウォークでは，各ステップの確率が直前の状態によらず独立に定まるため，
+$P, Q$ がスカラーとなり，左右の移動回数だけで確率が決まる。
+このため $\Xi_2(1,1)$ は $2 \times P \times Q$ に対応し，
+$n$ ステップで左に $l$ 回，右に $m$ 回移動する確率は，
+順序によらず二項係数 $\binom{n}{\ell}$ と $p^\ell q^m$ の積で表される。
+
+一方，相関付きランダムウォークでは $P$ と $Q$ が行列で\textbf{非可換}であるため，
+$\Xi_2(1,1) = QP + PQ \neq 2PQ$ が一般に成り立つ。
+すなわち，左右の移動回数が同じであっても，移動の順序が異なれば確率が異なる。
+このため，相関付きランダムウォークの確率分布は単純な二項係数では表せず，
+直前の方向に依存する経路ごとの寄与を行列積として加え合わせる必要がある。
+この違いが，相関付きランダムウォーク特有の持続性や反転傾向を生み出す。
+
+時刻 $n$ に位置 $x$ にいる確率は
+\begin{equation}
+  P(\tilde{S}_n = x) = \|\Xi_n(l,m)\,\varphi\|_1,
+  \qquad l = \tfrac{n-x}{2},\; m = \tfrac{n+x}{2}
+  \label{eq:crw_Xi}
+\end{equation}
+で与えられ，$\displaystyle\sum_{x} P(\tilde{S}_n = x) = 1$ を満たす。
+
+\subsubsection*{$n = 1, 2$ の具体計算}
+
+以下では $\varphi = (\alpha, \beta)^\top$（$\alpha + \beta = 1$），
+$P = \bigl(\begin{smallmatrix}a&b\\0&0\end{smallmatrix}\bigr)$，
+$Q = \bigl(\begin{smallmatrix}0&0\\c&d\end{smallmatrix}\bigr)$ を用いる。
+
+\medskip
+\noindent\textbf{$n=1$ のとき}（行列計算の詳細）は
+\begin{align*}
+  \widetilde{P}(\tilde{S}_1 = -1)
+    &= P\varphi
+     = \begin{pmatrix} a & b \\ 0 & 0 \end{pmatrix}
+       \begin{pmatrix} \alpha \\ \beta \end{pmatrix}
+     = \begin{pmatrix} a\alpha + b\beta \\ 0 \end{pmatrix}, \\[4pt]
+  \widetilde{P}(\tilde{S}_1 = +1)
+    &= Q\varphi
+     = \begin{pmatrix} 0 & 0 \\ c & d \end{pmatrix}
+       \begin{pmatrix} \alpha \\ \beta \end{pmatrix}
+     = \begin{pmatrix} 0 \\ c\alpha + d\beta \end{pmatrix}
+\end{align*}
+となる。よって
+\[
+  P(\tilde{S}_1 = -1) = a\alpha + b\beta, \qquad P(\tilde{S}_1 = +1) = c\alpha + d\beta
+\]
+である。和は $(a+c)\alpha + (b+d)\beta = \alpha + \beta = 1$ となり，確率測度であることが確認できる。
+
+\medskip
+\noindent\textbf{$n=2$ のとき}は
+\begin{align*}
+  P(\tilde{S}_2 = -2) &= a\,(a\alpha + b\beta), \\
+  P(\tilde{S}_2 =  0) &= b\,(c\alpha + d\beta) + c\,(a\alpha + b\beta), \\
+  P(\tilde{S}_2 = +2) &= d\,(c\alpha + d\beta)
+\end{align*}
+となる。
+このときの時刻 $n=1,2$ における遷移と確率を
+図\,\ref{fig:crw_transition} に示す。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{crw_transition}
+  \caption{相関付きランダムウォークの遷移と確率}
+  \label{fig:crw_transition}
+\end{figure}
+
+
+上の具体計算をもとに，
+\[
+  a=d=\frac{2}{3}, \qquad
+  b=c=\frac{1}{3}, \qquad
+  \alpha=\beta=\frac{1}{2}
+\]
+の場合の確率分布を図\,\ref{fig:crw_barchart} に示す。
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{crw_barchart}
+  \caption{相関付きランダムウォーク（$a=d=2/3,\ \alpha=\beta=1/2$）における時刻 $n=1,2,3,4$ の確率分布}
+  \label{fig:crw_barchart}
+\end{figure}
+
+\subsubsection*{通常のランダムウォークとの確率分布の比較}
+
+ここで，対称な通常のランダムウォーク（$p=q=1/2$）の確率分布（図\,\ref{fig:rw_barchart}）と，
+持続性をもつ相関付きランダムウォーク（$a=d=2/3$，$\alpha=\beta=1/2$）の確率分布（図\,\ref{fig:crw_barchart}）を，
+同じ時刻 $n=1,2,3,4$ について比較する。
+どちらも初期確率ベクトルが対称であるため，分布は原点まわりで左右対称であり，
+時刻 $n=1$ ではともに $P(\pm 1)=1/2$ となって完全に一致する。
+しかし時刻 $n=2$ では両者の差が現れる。
+通常のランダムウォークでは
+\[
+  P(S_2=0)=2pq=\tfrac{1}{2}, \qquad P(S_2=\pm 2)=\tfrac{1}{4}
+\]
+であるのに対し，相関付きランダムウォークでは
+\[
+  P(\tilde{S}_2=0)=\tfrac{1}{3}, \qquad P(\tilde{S}_2=\pm 2)=\tfrac{1}{3}
+\]
+となり，原点（$x=0$）の確率が小さく，両端（$x=\pm 2$）の確率が大きい。
+これは，相関付きランダムウォークでは直前と同じ方向へ進みやすい\textbf{持続性}（$a>1/2$）があるため，
+一度動き出した向きにそのまま進んで両端に到達しやすいことを反映している。
+この傾向は時刻が進むほど蓄積し，時刻 $n=3,4$ と進むにつれて，
+相関付きランダムウォークの分布は通常のランダムウォークの分布よりも
+中央が低く，裾が広い（より分散の大きい）形になっていく。
+このように，図\,\ref{fig:rw_barchart} と図\,\ref{fig:crw_barchart} を比べると，
+左右の移動回数が同じ経路でも順序によって確率が変わるという
+相関付きランダムウォークの性質が，分布の広がりの違いとして現れることがわかる。
+
+%---------------------------------------------------------
+\subsection{相関付きランダムウォークの極限分布}
+%---------------------------------------------------------
+
+本節では，相関付きランダムウォークに関する極限定理を紹介する。
+以下のコイン行列で定まる相関付きランダムウォークを考える。
+\begin{equation}
+  A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}
+\end{equation}
+ここで，相関付きランダムウォークが\textbf{時間発展対称}であるとは，
+$a = d$ かつ $b = c = 1 - a$（$0 < a < 1$）を満たすときをいい，このとき
+\begin{equation}
+  A = \begin{pmatrix} a & 1-a \\ 1-a & a \end{pmatrix}
+  \label{eq:sym_corr_matrix}
+\end{equation}
+の形になる。この場合，初期確率ベクトルを $\varphi = (1/2,\,1/2)^\top$ にとると，
+任意の $n \in \mathbb{Z}_{\geq 0}$ と $x \in \mathbb{Z}$ に対して
+$P(\tilde{S}_n = x) = P(\tilde{S}_n = -x)$ が成立し，確率測度は原点まわりで対称となる。
+
+確率測度が原点まわりで対称となる条件について，次がいえる。
+
+\begin{proposition}
+\eqref{eq:sym_corr_matrix} で定まる時間発展対称な相関付きランダムウォーク $(\tilde{S}_n)_{n \geq 0}$ について，次が成り立つ。
+\begin{enumerate}
+  \item 初期確率ベクトルを $\varphi = (1/2,\,1/2)^\top$ にとると，
+        任意の $n \in \mathbb{Z}_{\geq 0}$ と $x \in \mathbb{Z}$ に対して
+        $P(\tilde{S}_n = x) = P(\tilde{S}_n = -x)$ が成立する。
+  \item 特に $a = 1/2$（すなわち $p = a = 1/2$）のときは，初期確率ベクトル $\varphi$ によらず
+        （初期条件を問わず），任意の $n \in \mathbb{Z}_{\geq 0}$ と $x \in \mathbb{Z}$ に対して
+        $P(\tilde{S}_n = x) = P(\tilde{S}_n = -x)$ が成立する。
+\end{enumerate}
+\end{proposition}
+
+(2) の場合を確認する。$a = 1/2$ のとき，コイン行列は
+\[
+  A = \begin{pmatrix} 1/2 & 1/2 \\ 1/2 & 1/2 \end{pmatrix}, \qquad
+  P = \begin{pmatrix} 1/2 & 1/2 \\ 0 & 0 \end{pmatrix}, \qquad
+  Q = \begin{pmatrix} 0 & 0 \\ 1/2 & 1/2 \end{pmatrix}
+\]
+となる。このとき，任意の初期確率ベクトル $\varphi = (\alpha,\,\beta)^\top$（$\alpha + \beta = 1$）に対して
+\[
+  P\varphi = \begin{pmatrix} (\alpha+\beta)/2 \\ 0 \end{pmatrix} = \begin{pmatrix} 1/2 \\ 0 \end{pmatrix}, \qquad
+  Q\varphi = \begin{pmatrix} 0 \\ (\alpha+\beta)/2 \end{pmatrix} = \begin{pmatrix} 0 \\ 1/2 \end{pmatrix}
+\]
+となり，左右への移動確率はともに $1/2$ で，直前の方向に依存しない。
+したがって $a = 1/2$ のときは各ステップが実質的に独立となり，
+相関付きランダムウォークは初期の向きによらず対称な通常のランダムウォーク（$p=q=1/2$）に一致するため，
+初期確率ベクトル $\varphi$ を問わず確率測度は原点まわりで対称となる。
+
+時間発展対称な相関付きランダムウォークについて，以下の弱収束極限定理が成り立つ。
+
+\begin{theorem}[相関付きランダムウォークの弱収束極限定理~{\cite{ref2}}]
+\label{thm:clt_corr}
+\eqref{eq:sym_corr_matrix} で定まる時間発展対称な相関付きランダムウォーク $(\tilde{S}_n)_{n \geq 0}$ に対し，$n \to \infty$ とすると
+\begin{equation}
+  \frac{\tilde{S}_n}{\sqrt{n}} \;\Rightarrow\; W
+  \label{eq:clt_corr}
+\end{equation}
+が成立する。
+ここで $W$ の確率測度は $N\!\left(0,\,\dfrac{a}{1-a}\right)$ に従い，
+$N(m,\sigma^2)$ は平均 $m$ で分散 $\sigma^2$ の正規分布である。
+\end{theorem}
+
+なお，上記の極限測度 $W$ は初期の確率測度 $\varphi$ に依存しないことに注意する。
+
+極限分散 $\sigma^2 = \dfrac{a}{1-a}$ は，対称な通常ランダムウォーク（極限分散 $1$）と比較して，パラメータ $a$ に応じて次のように振る舞う。
+\begin{itemize}
+  \item $a = 1/2$ のとき，$\sigma^2 = 1$ であり通常ランダムウォークの極限分布と一致する。
+  \item $a > 1/2$（持続性）のとき，$\sigma^2 > 1$ となり分布の裾が広い。
+  \item $a < 1/2$（反転傾向）のとき，$\sigma^2 < 1$ となり分布の裾が狭い。
+\end{itemize}
+
+このとき，$a > 1/2$ の場合の極限分布を図\,\ref{fig:crw_limit_persistent} に，
+$a < 1/2$ の場合の極限分布を図\,\ref{fig:crw_limit_antipersistent} に示す。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{crw_limit_persistent}
+  \caption{相関付きランダムウォークの極限分布（持続性：$a>1/2$）}
+  \label{fig:crw_limit_persistent}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{crw_limit_antipersistent}
+  \caption{相関付きランダムウォークの極限分布（反転傾向：$a<1/2$）}
+  \label{fig:crw_limit_antipersistent}
+\end{figure}
+
+
+
+\newpage
+\section{相関付きランダムウォークの時系列モデル}
+
+本章では，前章で定義した相関付きランダムウォークを用いて，
+一般の離散時系列に対する予測モデルを構成する。
+このモデルは，Konno~\cite{ref3} が提案した量子ウォークに基づく時系列モデルの構成法を，
+相関付きランダムウォークに応用したものである。
+前章では，確率過程 $(\tilde{S}_n)_{n\geq0}$ の確率分布を
+コイン行列と確率ベクトルによって記述した。
+本章では，観測された時系列に対して評価関数を定め，
+その値を最小にするパラメータを用いて次時刻の値を予測する。
+
+以下では，左方向へ進んだ直後に再び左方向へ進む確率を $q$，
+右方向へ進んだ直後に再び右方向へ進む確率を $p$ とする。
+このとき，前章のパラメータとの対応は
+\[
+  a=q,\qquad b=1-p,\qquad c=1-q,\qquad d=p
+\]
+である。したがって，コイン行列は
+\begin{equation}
+  A(p,q)
+  =
+  \begin{pmatrix}
+    q & 1-p \\
+    1-q & p
+  \end{pmatrix},
+  \qquad 0\leq p,q\leq 1
+  \label{eq:A_pq_model}
+\end{equation}
+と書ける。
+特に，$p=q$ かつ初期確率ベクトルを $\varphi=(1/2,\,1/2)^\top$ にとった場合は，
+前章で定義した時間発展対称な相関付きランダムウォークに対応する。
+
+\subsection{時系列データの定義}
+
+観測された離散時系列を
+\[
+  x_0,x_1,x_2,\ldots,x_N
+\]
+とする。ただし，本章では初期値を
+\begin{equation}
+  x_0=0
+  \label{eq:model_x0}
+\end{equation}
+とし，各時刻の変化量を
+\begin{equation}
+  b_n=x_n-x_{n-1}
+  \qquad (n=1,2,\ldots,N)
+  \label{eq:model_bn}
+\end{equation}
+で定める。
+
+ここでは，相関付きランダムウォークに合わせて，
+各時刻の変化量が
+\begin{equation}
+  b_n\in\{-1,+1\}
+  \label{eq:model_bn_pm}
+\end{equation}
+を満たす場合を考える。
+すなわち，$b_n=-1$ は左方向への移動，
+$b_n=+1$ は右方向への移動を表す。
+このとき，時刻 $n$ における観測値は
+\begin{equation}
+  x_n=\sum_{k=1}^{n} b_k
+  \label{eq:model_xn}
+\end{equation}
+と表される。
+
+また，時刻 $n$ までに観測されたデータを
+\begin{equation}
+  D_n=\{x_0,x_1,\ldots,x_n\}
+  \label{eq:model_Dn}
+\end{equation}
+と書く。
+本章では，このデータ $D_n$ から時刻 $n+1$ の値を予測することを考える。
+
+\subsection{相関付きランダムウォークに基づく時系列モデル}
+
+前章で定義した相関付きランダムウォークの時刻 $t$ における位置確率を，
+パラメータ $(p,q,\alpha)$ を明示して
+\begin{equation}
+  \mu_t(x;p,q,\alpha)
+  =
+  P(\tilde{S}_t=x)
+  \label{eq:model_mu}
+\end{equation}
+と書く。
+ここで，$\alpha$ は初期状態が左向きである確率を表す初期パラメータである。
+
+$(p,q,\alpha)$ を1組定めると，
+前章で述べた確率ベクトルの時間発展によって，
+各時刻 $t$ における位置の確率分布
+\[
+  \{\mu_t(x;p,q,\alpha)\}_{x=-t,-t+1,\ldots,t}
+\]
+が定まる。
+ただし，時刻 $t$ に到達できない位置については
+\[
+  \mu_t(x;p,q,\alpha)=0
+\]
+とみなす。
+
+時系列モデルとしては，観測された値 $x_t$ が，
+この確率分布の中でどの程度自然に現れるかを評価する。
+そのため，モデルの確率分布と観測データとのずれを測る評価関数を定め，
+その値を最小にするパラメータを推定する。
+
+\subsection{評価関数の定義}
+
+時刻 $n$ までの観測データ
+\[
+  D_n=\{x_0,x_1,\ldots,x_n\}
+\]
+が与えられたとする。
+パラメータ $(p,q,\alpha)$ によって定まる相関付きランダムウォークの確率分布
+$\mu_t(x;p,q,\alpha)$ を用いて，評価関数を
+\begin{equation}
+  V_n(p,q,\alpha)
+  =
+  \sum_{t=0}^{n}
+  \sum_{x=-t}^{t}
+  (x-x_t)^2\,
+  \mu_t(x;p,q,\alpha)
+  \label{eq:model_Vn}
+\end{equation}
+と定義する。
+
+内側の和は，$x=-t,-t+1,\ldots,t-1,t$ についてとる。
+ただし，時刻 $t$ に到達できない位置では
+$\mu_t(x;p,q,\alpha)=0$ とする。
+したがって，$V_n(p,q,\alpha)$ は，
+時刻 $0$ から時刻 $n$ までの各時刻において，
+観測値 $x_t$ とモデルが取り得る位置 $x$ との二乗誤差を，
+その位置にいる確率 $\mu_t(x;p,q,\alpha)$ で重み付けした量である。
+
+時刻 $n$ における推定パラメータを
+\begin{equation}
+  (p_n^\ast,q_n^\ast,\alpha_n^\ast)
+  \in
+  \operatorname*{argmin}_{(p,q,\alpha)\in[0,1]^3}
+  V_n(p,q,\alpha)
+  \label{eq:model_argmin}
+\end{equation}
+によって定める。
+
+最小値を与えるパラメータが一意に定まる場合には，
+そのパラメータのもとでの次時刻の期待値を予測値とし，
+\begin{equation}
+  x_{n+1}^{\ast}
+  =
+  E(\tilde{S}_{n+1}\mid p_n^\ast,q_n^\ast,\alpha_n^\ast)
+  =
+  \sum_{x=-(n+1)}^{n+1}
+  x\,\mu_{n+1}(x;p_n^\ast,q_n^\ast,\alpha_n^\ast)
+  \label{eq:model_prediction}
+\end{equation}
+と定める。
+ただし，到達できない位置では
+$\mu_{n+1}(x;p_n^\ast,q_n^\ast,\alpha_n^\ast)=0$ とする。
+
+一方，$V_n(p,q,\alpha)$ がパラメータに依存せず定数となる場合には，
+データから次の方向を判断する情報が得られないとみなし，
+\begin{equation}
+  x_{n+1}^{\ast}=x_n
+  \label{eq:model_prediction_const}
+\end{equation}
+とする。
+
+また，最小値を与えるパラメータが複数存在する場合には，
+それらを
+\[
+  (p^{(1)},q^{(1)},\alpha^{(1)}),\ldots,
+  (p^{(K)},q^{(K)},\alpha^{(K)})
+\]
+とおき，各パラメータから得られる期待値の相加平均を用いて
+\begin{equation}
+  x_{n+1}^{\ast}
+  =
+  \frac{1}{K}
+  \sum_{k=1}^{K}
+  E(\tilde{S}_{n+1}\mid p^{(k)},q^{(k)},\alpha^{(k)})
+  \label{eq:model_prediction_multiple}
+\end{equation}
+と定める。
+
+以上の手順を各時刻 $n$ に対して繰り返すことで，
+観測時系列に対応する予測列
+\[
+  x_1^\ast,x_2^\ast,\ldots,x_N^\ast
+\]
+を得る。
+\newpage
+\section{解析手法}
+
+本章では，前章で定式化した相関付きランダムウォークに基づく時系列モデルを，
+実際の価格データに適用するための手順を述べる。
+解析では，連続的に変動する価格系列をそのまま扱うのではなく，
+一定の値幅ごとに上昇・下降を判定し，
+$\{-1,+1\}$ の離散的な系列へ変換する。
+これにより，価格変動を相関付きランダムウォークの枠組みで扱える形にする。
+
+\subsection{データの構成}
+
+本研究で用いる原データは，XAUUSD の価格系列である。
+ここで，XAUUSD とは，金（Gold）と米ドル（US Dollar）の通貨ペアを表す記号であり，
+1 オンスあたりの金価格を米ドル建てで示したものである。
+金は国際的に取引される代表的な貴金属であり，
+XAUUSD はインフレや地政学的リスクを反映する指標として，
+投資判断やリスク管理の場面で広く参照されている。
+
+各時刻 $t$ における XAUUSD の価格を
+\[
+  P_t
+\]
+と書き，価格系列を
+\[
+  P_0,P_1,P_2,\ldots,P_T
+\]
+と表す。
+この価格系列は，時刻を横軸，価格を縦軸とするラインチャートとして表される。
+
+本研究では，このラインチャートとして表される価格系列をもとに
+平均練行足を構成し，価格変動を上昇方向と下降方向の符号列へ変換する。
+すなわち，価格が一定の値幅だけ上昇した場合を $+1$，
+一定の値幅だけ下降した場合を $-1$ として記録する。
+
+平均練行足を構成するために，値幅を表す定数を
+\[
+  B>0
+\]
+とする。
+この $B$ は，1 本の足を生成するために必要な価格変化幅である。
+平均練行足の符号列を
+\[
+  b_1,b_2,\ldots,b_N,
+  \qquad b_i\in\{-1,+1\}
+\]
+とする。
+ここで，$b_i=+1$ は価格が上方向へ $B$ だけ動いたことを表し，
+$b_i=-1$ は価格が下方向へ $B$ だけ動いたことを表す。
+
+平均練行足の生成では，基準価格を $o_i$ とおく。
+初期値を
+\[
+  o_1=P_0
+\]
+とし，逐次的に価格 $P_t$ を観測する。
+このとき，
+\[
+  P_t \geq o_i+B
+\]
+となった場合には，上昇方向の足を生成し，
+\[
+  b_i=+1,\qquad o_{i+1}=o_i+B
+\]
+とする。
+一方，
+\[
+  P_t \leq o_i-B
+\]
+となった場合には，下降方向の足を生成し，
+\[
+  b_i=-1,\qquad o_{i+1}=o_i-B
+\]
+とする。
+どちらの条件も満たさない場合には，新しい足は生成しない。
+
+また，1 回の価格変動によって複数の値幅を超える場合には，
+同じ方向の足を複数本生成する。
+すなわち，ある整数 $k\geq2$ に対して
+\[
+  |P_t-o_i|\geq kB
+\]
+となる場合には，価格変動の方向に応じて
+\[
+  b_i,b_{i+1},\ldots,b_{i+k-1}
+\]
+を同符号として生成し，基準価格を $kB$ だけ更新する。
+
+このようにして得られた平均練行足の符号列から，
+ボックス単位の整数値時系列
+\[
+  x_0,x_1,\ldots,x_N
+\]
+を構成する。
+初期値を
+\begin{equation}
+  x_0=0
+  \label{eq:analysis_x0}
+\end{equation}
+とし，
+\begin{equation}
+  x_n=x_{n-1}+b_n
+  \qquad (n=1,2,\ldots,N)
+  \label{eq:analysis_xn}
+\end{equation}
+によって定める。
+したがって，$x_n$ は時刻 $n$ までに生成された平均練行足の符号を累積した値であり，
+ボックス単位で見た価格の位置を表す。
+
+時刻 $n$ までに得られた観測データを
+\begin{equation}
+  D_n=\{x_0,x_1,\ldots,x_n\}
+  \label{eq:analysis_Dn}
+\end{equation}
+と書く。
+以降の解析では，この離散時系列 $D_n$ を入力データとして用い，
+相関付きランダムウォークモデルにより次時刻の値を予測する。
+
+以上の変換手順を視覚的に示すため，
+加工前の価格系列と，そこから生成される平均練行足を
+図\,\ref{fig:linechart_renko_compare} に示す。
+左図は，時刻を横軸，価格を縦軸とした XAUUSD の1営業日における価格系列である。
+一方，右図は，値幅 $B$ に基づいて生成された平均練行足であり，
+価格が上方向へ $B$ だけ動いた場合を $+1$，
+下方向へ $B$ だけ動いた場合を $-1$ として表している。
+
+このように，連続的な価格系列を一定の値幅ごとの上昇・下降に変換することで，
+価格変動を相関付きランダムウォークで扱うための離散時系列として表すことができる。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{linechart_renko_compare}
+  \caption{価格系列から平均練行足への変換例}
+  \label{fig:linechart_renko_compare}
+\end{figure}
+\newpage
+\section{実験結果}
+
+\subsection{実験設定}
+
+本章では，本研究で構成した相関付きランダムウォークに基づく時系列モデルを
+XAUUSD の実価格データに適用し，その予測性能を定量的に評価する。
+
+\subsubsection*{データ}
+
+用いる原データは XAUUSD の1分足価格系列 $P_0,P_1,\ldots,P_T$ であり，
+[対象期間（例：20XX年X月X日〜同年X月X日）]% ← 実際の期間に置き換え
+の区間を対象とする。
+前章で述べた手順に従って値幅 $B=[値]$% ← 実際の値に置き換え
+の平均練行足を構成し，符号列 $b_1,\ldots,b_N$（足の総数 $N=[値]$ 本）を得た。
+これを累積した整数時系列 $x_n=\sum_{k=1}^{n}b_k$（$x_0=0$）を解析の入力とする。
+
+値幅 $B$ は，[選定方針を記述。例：生成される足の本数が解析に十分であり，
+かつ微小な価格変動を過度に足として拾わない値となるよう，予備的に複数の候補を
+比較して定めた]。
+
+\subsubsection*{予測手順}
+
+時刻 $n$ における予測は，直近 $W$ 本（参照期間）の部分系列のみを用いて
+評価関数 $V_n(p,q,\alpha)$（式\eqref{eq:model_Vn}）を最小化し，
+得られたパラメータのもとで式\eqref{eq:model_prediction} の期待値を
+次時刻の予測値 $x_{n+1}^{\ast}$ とすることで行う。
+この操作を各時刻について繰り返し，予測列 $x_1^{\ast},\ldots,x_N^{\ast}$ を得る。
+
+\subsubsection*{評価指標}
+
+本研究では予測値 $x_n^{\ast}$ と実測値 $x_n$ を同一図に重ねて描き，
+予測が値動きに追従できているかを視覚的に確認する。
+ただし視覚的な確認のみでは評価が主観的になるため，
+予測性能の判断は次の2つの定量指標を主たる基準として行う。
+
+第一に，予測値と実測値の平均絶対誤差
+\begin{equation}
+  \mathrm{MAE}=\frac{1}{N}\sum_{n=1}^{N}\lvert x_n-x_n^{\ast}\rvert
+  \label{eq:mae}
+\end{equation}
+を用いる。練行足は毎ステップ必ず $\pm1$ 動くため，
+直前の値をそのまま予測する「変化なし」予測の MAE は常に $1$ となる。
+したがって $\mathrm{MAE}<1$ は，予測が「変化なし」予測よりも誤差が小さいことの目安となる。
+
+第二に，予測した方向と実際の方向の一致率
+\begin{equation}
+  \mathrm{ACC}=\frac{1}{N}\sum_{n=1}^{N}
+    \mathbf{1}\!\left[\operatorname{sign}\!\left(x_n^{\ast}-x_{n-1}\right)=b_n\right]
+  \label{eq:acc}
+\end{equation}
+を用いる。ここで $b_n=x_n-x_{n-1}\in\{-1,+1\}$ は実際の値動きの方向，
+$\operatorname{sign}(\cdot)$ は符号関数，$\mathbf{1}[\cdot]$ は
+括弧内の条件が成り立つとき $1$，そうでないとき $0$ をとる指示関数である
+（予測が $x_n^{\ast}=x_{n-1}$ となり方向を定めない場合は不一致として数える）。
+方向を当てずっぽうに予測した場合の一致率は $0.5$ であるため，
+$\mathrm{ACC}>0.5$ は予測が値動きの方向の判別に寄与していることの目安となる。
+
+MAE は予測値と実測値の隔たりの大きさを，ACC は値動きの向きを正しく
+捉えられているかを表しており，両者を併せて予測性能を評価する。
+
+\subsection{予備実験：参照期間の検討}
+
+参照期間 $W$ は予測性能を左右するパラメータである。
+まず $W$ を極端にとった場合として，$W=2$ と全期間
+（参照期間を区切らず時刻 $n$ までのすべての足を用いる場合）を比較する。
+両者の予測性能を表\,\ref{tab:prelim_w} に，予測の様子を図\,\ref{fig:prelim_w} に示す。
+
+[結果の記述。例：$W=2$ では直近の値動きのみを参照するため予測が過敏に振れ，
+全期間では古い情報の影響が残って転換への追従が遅れる傾向がみられた。]
+
+\begin{table}[H]\centering
+  \caption{極端な参照期間における全期間の予測性能}
+  \label{tab:prelim_w}
+  \begin{tabular}{l|cc}\hline
+    指標 & $W=2$ & 全期間 \\\hline
+    MAE & ? & ? \\
+    ACC & ? & ? \\\hline
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{prelim_w}
+  \caption{極端な参照期間（$W=2$・全期間）における実測 $x_n$ と予測 $x_n^{\ast}$}
+  \label{fig:prelim_w}
+\end{figure}
+
+以上より，極端な値を避けた中庸な参照期間として $W=10,30,60$ の3通りを採用し，
+以降の解析に用いる。
+
+\subsection{全期間における予測性能}
+
+採用した $W=10,30,60$ について，対象期間全体での MAE と ACC を
+表\,\ref{tab:whole_period} に示す。
+
+[結果の記述。例：いずれの $W$ でも MAE は基準値 $1$ を[下回り/上回り]，
+ACC は $0.5$ を[上回った/下回った]。$W=[値]$ のとき最も良い予測性能を示した，など，
+まず本モデル全体の予測性能の傾向を述べる。]
+
+\begin{table}[H]\centering
+  \caption{全期間における各参照期間の予測性能}
+  \label{tab:whole_period}
+  \begin{tabular}{l|ccc}\hline
+    指標 & $W=10$ & $W=30$ & $W=60$ \\\hline
+    MAE & ? & ? & ? \\
+    ACC & ? & ? & ? \\\hline
+  \end{tabular}
+\end{table}
+
+% 全期間の重ね描きは点数が多く密になりやすい。
+% 全体が見にくい場合は代表的な区間の抜粋に差し替えるか，図ごと省いて表だけでもよい。
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{whole_period_w}
+  \caption{全期間における実測 $x_n$ と $W=10,30,60$ の予測}
+  \label{fig:whole_period}
+\end{figure}
+
+\subsection{チャートパターン別の分析}
+
+前節の全期間にわたる結果を踏まえ，本節では値動きの局面ごとに予測の振る舞いを調べる。
+本モデルは値動きの上昇方向と下降方向を対称に扱うため，
+下降局面における予測は対応する上昇局面の予測を上下反転したものとなる。
+そこで上昇局面のライフサイクルに対応する次の4パターンを代表例として取り上げる。
+
+[パターンの抽出基準を記述。例：整数時系列 $x_n$ の一定区間における変化量と変動幅に
+基づき，上昇が継続する区間，レンジから上昇へ移る区間，上昇からレンジへ移る区間，
+上昇から下降へ転じる区間をそれぞれ抽出した。]
+
+各パターンについて $W=10,30,60$ の予測を実測値と同一図に重ねて示し，
+各区間の MAE と ACC を表\,\ref{tab:pattern_summary} にまとめる。
+
+\subsubsection*{上昇継続}
+図\,\ref{fig:pat_uptrend} に示す。
+[結果の記述。例：上昇が継続する局面では，直前と同じ方向へ進みやすいという
+持続性をモデルが捉え，予測が実測値に概ね追従した。]
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{pat_uptrend_w}
+  \caption{上昇継続：実測 $x_n$ と $W=10,30,60$ の予測}
+  \label{fig:pat_uptrend}
+\end{figure}
+
+\subsubsection*{レンジ→上昇}
+図\,\ref{fig:pat_range2up} に示す。
+[結果の記述。例：レンジから上昇へ移行する局面で，
+ブレイク直後の転換に予測が追従[できた/遅れた]。]
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{pat_range2up_w}
+  \caption{レンジ→上昇：実測 $x_n$ と $W=10,30,60$ の予測}
+  \label{fig:pat_range2up}
+\end{figure}
+
+\subsubsection*{上昇→レンジ}
+図\,\ref{fig:pat_up2range} に示す。
+[結果の記述。例：上昇からレンジへ移る局面で，天井付近で上昇の勢いを
+引きずり予測が[上振れした/速やかに追従した]。]
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{pat_up2range_w}
+  \caption{上昇→レンジ：実測 $x_n$ と $W=10,30,60$ の予測}
+  \label{fig:pat_up2range}
+\end{figure}
+
+\subsubsection*{上昇→下降}
+図\,\ref{fig:pat_up2down} に示す。
+[結果の記述。例：上昇から下降へ転じる局面では，直前までの上昇の持続性を
+仮定するモデルの性質上，反転に追従できず予測が大きく外れた。]
+\begin{figure}[H]\centering
+  \includegraphics[width=\textwidth]{pat_up2down_w}
+  \caption{上昇→下降：実測 $x_n$ と $W=10,30,60$ の予測}
+  \label{fig:pat_up2down}
+\end{figure}
+
+\begin{table}[H]\centering
+  \caption{各パターン・各参照期間の予測性能（各セルは MAE / ACC）}
+  \label{tab:pattern_summary}
+  \begin{tabular}{l|ccc}\hline
+    パターン & $W=10$ & $W=30$ & $W=60$ \\\hline
+    上昇継続     & ? / ? & ? / ? & ? / ? \\
+    レンジ→上昇 & ? / ? & ? / ? & ? / ? \\
+    上昇→レンジ & ? / ? & ? / ? & ? / ? \\
+    上昇→下降   & ? / ? & ? / ? & ? / ? \\\hline
+  \end{tabular}
+\end{table}
+
+\subsection{まとめ}
+
+本章の結果をまとめる。全期間にわたる定量評価（表\,\ref{tab:whole_period}）では，
+[全体傾向。例：MAE は「変化なし」予測の基準値 $1$ を下回り，ACC は $0.5$ を
+上回ったことから，本モデルは値動きの方向の判別に一定程度寄与した]。
+参照期間別には [W に関する傾向を記述]。
+
+局面別の分析（表\,\ref{tab:pattern_summary}）では，
+上昇が継続する局面で予測が値動きに追従する一方，
+転換点（レンジ→上昇・上昇→レンジ・上昇→下降）では追従が遅れる，
+あるいは反転に追従できず予測を外す傾向が確認された。
+これは，直前と同じ方向へ進みやすいという持続性を仮定する本モデルの性質に起因すると
+考えられ，持続的な局面に強く，転換点に弱いという特徴を示している。
+
+\newpage
+\section{考察}
+
+
+\section{今後の課題}
+
+
+\newpage
+\begin{thebibliography}{9}
+
+\bibitem{ref3}
+  N.~Konno,
+  A new time-series model based on quantum walk,
+  Quantum Studies: Mathematics and Foundations, \textbf{6}, 61--72 (2019).
+  % DOI: 10.1007/s40509-018-0162-1
+
+\bibitem{ref1}
+  % TODO: 書誌情報を記入（第3章の大数の法則・中心極限定理で参照した教科書）
+  著者名，『書名』，出版社（出版年）．
+
+\bibitem{ref2}
+  % TODO: 書誌情報を記入（第4章の相関付きランダムウォークの弱収束極限定理で参照した文献）
+  著者名，論文題目，誌名，\textbf{巻}，頁（出版年）．
+
+\end{thebibliography}
+\newpage
+\section{付録}
+\end{document}
