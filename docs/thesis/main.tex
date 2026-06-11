@@ -615,22 +615,89 @@ $N(m,\sigma^2)$ は平均 $m$ で分散 $\sigma^2$ の正規分布である。
   \item $a < 1/2$（反転傾向）のとき，$\sigma^2 < 1$ となり分布の裾が狭い。
 \end{itemize}
 
-このとき，$a > 1/2$ の場合の極限分布を図\,\ref{fig:crw_limit_persistent} に，
-$a < 1/2$ の場合の極限分布を図\,\ref{fig:crw_limit_antipersistent} に示す。
+この定理を数値的に確認するため，時間発展対称な相関付きランダムウォーク
+（初期確率ベクトル $\varphi = (1/2,\,1/2)^\top$）について，
+式\eqref{eq:crw_evolution} の時間発展を反復して時刻 $n = 100$ における
+確率分布 $P(\tilde{S}_n = x)$ を厳密に計算し，
+定理\,\ref{thm:clt_corr} と同じ再スケールを施した変数
+$u = \tilde{S}_n/\sqrt{n}$ のヒストグラムとして図示する。
+$\tilde{S}_n$ は $n$ と同じ偶奇の整数値のみをとるため，
+ヒストグラムの棒は間隔 $2/\sqrt{n}$ で並び，
+棒の高さは確率をビン幅 $2/\sqrt{n}$ で割って密度に換算してある。
+これにより，正規分布の密度関数と同じ縦軸スケールで直接比較できる。
+各図には，対称な通常のランダムウォークの極限分布である標準正規分布
+$N(0,1)$（破線，系\,\ref{cor:clt_sym}）と，
+定理\,\ref{thm:clt_corr} の極限分布 $N\!\left(0,\,a/(1-a)\right)$（実線）を
+重ねて描いた。
+
+持続性をもつ場合として $a = 2/3$（$\sigma^2 = 2$）の結果を
+図\,\ref{fig:crw_limit_persistent} に，
+反転傾向をもつ場合として $a = 1/3$（$\sigma^2 = 1/2$）の結果を
+図\,\ref{fig:crw_limit_antipersistent} に示す。
+さらに，両者の分布を標準正規分布とともに 1 つの図に重ねた比較を
+図\,\ref{fig:crw_hist_n100} に示す。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.75\textwidth]{crw_limit_persistent}
-  \caption{相関付きランダムウォークの極限分布（持続性：$a>1/2$）}
+  \includegraphics[width=0.8\textwidth]{crw_limit_persistent}
+  \caption{持続性をもつ相関付きランダムウォーク（$a=2/3$）の時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ の分布と正規分布の比較}
   \label{fig:crw_limit_persistent}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.75\textwidth]{crw_limit_antipersistent}
-  \caption{相関付きランダムウォークの極限分布（反転傾向：$a<1/2$）}
+  \includegraphics[width=0.8\textwidth]{crw_limit_antipersistent}
+  \caption{反転傾向をもつ相関付きランダムウォーク（$a=1/3$）の時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ の分布と正規分布の比較}
   \label{fig:crw_limit_antipersistent}
 \end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{crw_hist_n100}
+  \caption{持続性（$a=2/3$）と反転傾向（$a=1/3$）の相関付きランダムウォークの分布（$n=100$）と標準正規分布の比較}
+  \label{fig:crw_hist_n100}
+\end{figure}
+
+\subsubsection*{極限分布に関する考察}
+
+図\,\ref{fig:crw_limit_persistent}〜図\,\ref{fig:crw_hist_n100} から，
+次のことが読み取れる。
+
+第一に，時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ のヒストグラムは，
+いずれの場合も極限分布 $N(0,\,a/(1-a))$ の密度曲線（実線）とほぼ重なっている。
+実際，$\tilde{S}_n/\sqrt{n}$ の分散を数値計算すると，
+$a=2/3$ のとき $1.99$（極限値 $2$），$a=1/3$ のとき $0.50$（極限値 $1/2$）であり，
+定理\,\ref{thm:clt_corr} の弱収束は $n=100$ 程度の有限時刻で
+既に良い近似として成立していることが確認できる。
+
+第二に，標準正規分布 $N(0,1)$（破線）と比較すると，
+持続性をもつ $a=2/3$ の分布は中央が低く裾の広い形に，
+反転傾向をもつ $a=1/3$ の分布は中央が高く裾の狭い形になっている。
+これは，図\,\ref{fig:rw_barchart} と図\,\ref{fig:crw_barchart} の比較で
+時刻 $n=1,\ldots,4$ について観察した「持続性は分布を広げる」という傾向が
+時刻とともに蓄積し，極限において分散 $\sigma^2 = a/(1-a)$ の違いとして
+現れたものと解釈できる。
+
+第三に，極限分散は $r = 2a-1$ を用いて
+\[
+  \sigma^2 = \frac{a}{1-a} = \frac{1+r}{1-r}
+\]
+と書き直せる。ここで $r = a - (1-a)$ は，直前と同じ方向へ進む確率と
+反対方向へ進む確率の差であり，連続する 2 ステップの方向の相関の強さを表す。
+$r>0$（持続性）ならば $\sigma^2>1$，$r<0$（反転傾向）ならば $\sigma^2<1$，
+$r=0$ ならば $\sigma^2=1$ となる。
+すなわち，各ステップの移動量が $\pm1$ である点は通常のランダムウォークと
+同じであっても，直前の方向という 1 ステップ分の記憶は，
+長時間スケールでは分布のばらつきの大きさの違いとして現れる。
+一方で，極限が正規分布になるという性質自体は相関によって変わらない。
+
+この性質は，次章以降で扱う金価格の値動きの解析においても基本となる。
+値動きの系列に持続性があれば，同じ本数の足が経過したときの累積的な
+値動きの広がりは，独立な値動き（通常のランダムウォーク）を仮定した場合より
+大きくなり，反転傾向があれば小さくなる。
+したがって，観測された値動きの系列から持続性・反転傾向の強さ
+（本章のパラメータ $a$，より一般には次章の $p,q$）を推定することが，
+本研究で構成する時系列モデルの中心的な役割となる。
 
 
 
