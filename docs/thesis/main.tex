@@ -625,31 +625,12 @@ $\tilde{S}_n$ は $n$ と同じ偶奇の整数値のみをとるため，
 ヒストグラムの棒は間隔 $2/\sqrt{n}$ で並び，
 棒の高さは確率をビン幅 $2/\sqrt{n}$ で割って密度に換算してある。
 これにより，正規分布の密度関数と同じ縦軸スケールで直接比較できる。
-各図には，対称な通常のランダムウォークの極限分布である標準正規分布
-$N(0,1)$（破線，系\,\ref{cor:clt_sym}）と，
-定理\,\ref{thm:clt_corr} の極限分布 $N\!\left(0,\,a/(1-a)\right)$（実線）を
-重ねて描いた。
 
-持続性をもつ場合として $a = 2/3$（$\sigma^2 = 2$）の結果を
-図\,\ref{fig:crw_limit_persistent} に，
-反転傾向をもつ場合として $a = 1/3$（$\sigma^2 = 1/2$）の結果を
-図\,\ref{fig:crw_limit_antipersistent} に示す。
-さらに，両者の分布を標準正規分布とともに 1 つの図に重ねた比較を
-図\,\ref{fig:crw_hist_n100} に示す。
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.8\textwidth]{crw_limit_persistent}
-  \caption{持続性をもつ相関付きランダムウォーク（$a=2/3$）の時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ の分布と正規分布の比較}
-  \label{fig:crw_limit_persistent}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.8\textwidth]{crw_limit_antipersistent}
-  \caption{反転傾向をもつ相関付きランダムウォーク（$a=1/3$）の時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ の分布と正規分布の比較}
-  \label{fig:crw_limit_antipersistent}
-\end{figure}
+持続性をもつ場合として $a = 2/3$（$\sigma^2 = 2$），
+反転傾向をもつ場合として $a = 1/3$（$\sigma^2 = 1/2$）の 2 通りの分布を，
+対称な通常のランダムウォークの極限分布である標準正規分布
+$N(0,1)$（破線，系\,\ref{cor:clt_sym}）とともに
+図\,\ref{fig:crw_hist_n100} に重ねて示す。
 
 \begin{figure}[H]
   \centering
@@ -660,15 +641,15 @@ $N(0,1)$（破線，系\,\ref{cor:clt_sym}）と，
 
 \subsubsection*{極限分布に関する考察}
 
-図\,\ref{fig:crw_limit_persistent}〜図\,\ref{fig:crw_hist_n100} から，
-次のことが読み取れる。
+図\,\ref{fig:crw_hist_n100} から，次のことが読み取れる。
 
-第一に，時刻 $n=100$ における $\tilde{S}_n/\sqrt{n}$ のヒストグラムは，
-いずれの場合も極限分布 $N(0,\,a/(1-a))$ の密度曲線（実線）とほぼ重なっている。
-実際，$\tilde{S}_n/\sqrt{n}$ の分散を数値計算すると，
-$a=2/3$ のとき $1.99$（極限値 $2$），$a=1/3$ のとき $0.50$（極限値 $1/2$）であり，
-定理\,\ref{thm:clt_corr} の弱収束は $n=100$ 程度の有限時刻で
-既に良い近似として成立していることが確認できる。
+第一に，どちらの分布も原点まわりに対称な釣鐘型をしており，
+正規分布に近い形をしている。
+これは，定理\,\ref{thm:clt_corr} の弱収束が時刻 $n=100$ 程度の有限時刻で
+既に良い近似として成り立っていることを示している。
+実際，$\tilde{S}_n/\sqrt{n}$ の分散を数値的に計算すると，
+$a=2/3$ のとき $1.99$，$a=1/3$ のとき $0.50$ となり，
+それぞれ極限分散 $a/(1-a)=2,\ 1/2$ にほぼ一致する。
 
 第二に，標準正規分布 $N(0,1)$（破線）と比較すると，
 持続性をもつ $a=2/3$ の分布は中央が低く裾の広い形に，
