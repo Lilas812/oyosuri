@@ -51,6 +51,8 @@ Colab で GitHub から実行する場合:
 
 from __future__ import annotations
 
+import time
+from collections import Counter
 from typing import Sequence
 
 import matplotlib.pyplot as plt
@@ -348,4 +350,254 @@ def run_multi_w_overlay(
     return fig, {
         "x": x, "bricks": bricks, "N": N,
         "preds": preds_by_w, "mae": mae_by_w,
+    }
+
+
+# ============================================================================
+# 参照期間 W の感度分析（MAE ＋ 計算時間） — 卒論 §7.2 用
+# ============================================================================
+
+def timed_preds_for_window(
+    x: Sequence[int],
+    W,
+    *,
+    grid_size: int = 11,
+    symmetric: bool = False,
+) -> tuple[list[float], float]:
+    """参照期間 W の予測列と所要時間（秒）を返す.
+
+    時間は ``_preds_for_window`` 全体（全ステップの fit ＋予測）の
+    wall-clock。同一マシン・同一系列で W だけ変えて比較する用途を想定。
+    """
+    t0 = time.perf_counter()
+    preds = _preds_for_window(x, W, grid_size=grid_size, symmetric=symmetric)
+    return preds, time.perf_counter() - t0
+
+
+def sweep_by_window(
+    x: Sequence[int],
+    windows: Sequence,
+    *,
+    include_full: bool = True,
+    grid_size: int = 11,
+    symmetric: bool = False,
+) -> dict[str, dict]:
+    """各参照期間 W の MAE と計算時間を ``{W: {...}}`` で返す.
+
+    ``mae_by_window`` の計時付き版。返り値の各エントリは
+
+        {"mae": float, "time_s": float, "time_per_step_ms": float,
+         "preds": list[float]}
+
+    で，``preds`` は重ね描き（``plot_walk_multi_w``）への再利用用。
+    """
+    x = list(x)
+    N = len(x) - 1
+    if N < 1:
+        raise ValueError("x must contain at least 2 points")
+    actual = [float(v) for v in x[1:]]
+
+    labels: list[tuple[str, object]] = []
+    for W in windows:
+        label = "full" if _is_full(W, N) else str(int(W))
+        if label not in (lb for lb, _ in labels):
+            labels.append((label, W))
+    if include_full and "full" not in (lb for lb, _ in labels):
+        labels.append(("full", "full"))
+
+    out: dict[str, dict] = {}
+    for label, W in labels:
+        preds, secs = timed_preds_for_window(
+            x, W, grid_size=grid_size, symmetric=symmetric)
+        out[label] = {
+            "mae": mae(actual, preds),
+            "time_s": secs,
+            "time_per_step_ms": 1000.0 * secs / max(len(preds), 1),
+            "preds": preds,
+        }
+    return out
+
+
+def print_w_sweep(table: dict[str, dict]) -> None:
+    """``sweep_by_window`` の結果を整形して表示する."""
+    print(f"{'W':>6} | {'MAE':>8} | {'time[s]':>9} | {'ms/step':>8}")
+    print("-" * 42)
+    for label, row in table.items():
+        print(
+            f"{label:>6} | {row['mae']:>8.4f} | {row['time_s']:>9.2f}"
+            f" | {row['time_per_step_ms']:>8.1f}"
+        )
+
+
+def w_sweep_to_latex(table: dict[str, dict]) -> str:
+    """``sweep_by_window`` の結果から卒論の表（tab:w_sweep）の中身を作る.
+
+    列 = 各参照期間（"full" は 全期間），行 = MAE／総計算時間／1ステップ
+    当たり時間。出力をそのまま tabular 環境に貼り付けられる。
+    """
+    labels = list(table.keys())
+    heads = ["全期間" if lb == "full" else f"$W={lb}$" for lb in labels]
+    col_spec = "l|" + "c" * len(labels)
+    lines = [
+        f"\\begin{{tabular}}{{{col_spec}}}\\hline",
+        "    指標 & " + " & ".join(heads) + " \\\\\\hline",
+        "    MAE & "
+        + " & ".join(f"{table[lb]['mae']:.3f}" for lb in labels)
+        + " \\\\",
+        "    総計算時間 [s] & "
+        + " & ".join(f"{table[lb]['time_s']:.1f}" for lb in labels)
+        + " \\\\",
+        "    1ステップ当たり [ms] & "
+        + " & ".join(f"{table[lb]['time_per_step_ms']:.0f}" for lb in labels)
+        + " \\\\\\hline",
+        "\\end{tabular}",
+    ]
+    return "\n".join(lines)
+
+
+def plot_w_sweep(
+    table: dict[str, dict],
+    *,
+    N: int | None = None,
+    title: str | None = None,
+):
+    """W スイープの 2 パネル要約図（左: MAE，右: 1ステップ当たり時間）を返す.
+
+    横軸は参照期間 W（対数軸）。"full"（全期間）は W=N の位置に置き，
+    目盛りラベルを「全期間」とする（``N`` 必須）。左パネルには
+    「変化なし」予測の基準 MAE=1 を破線で示す。白黒印刷を想定して
+    黒の白抜きマーカー＋実線で描く。
+    """
+    jp = _setup_jp_font()
+    full_label = "全期間" if jp else "full"
+    xlab = "参照期間 $W$" if jp else "reference window $W$"
+    base_label = "「変化なし」予測 (MAE=1)" if jp else "no-change (MAE=1)"
+
+    ws: list[float] = []
+    ticks: list[str] = []
+    for label in table:
+        if label == "full":
+            if N is None:
+                raise ValueError("table に 'full' を含む場合は N を指定する")
+            ws.append(float(N))
+            ticks.append(full_label)
+        else:
+            ws.append(float(int(label)))
+            ticks.append(label)
+    maes = [table[lb]["mae"] for lb in table]
+    ms = [table[lb]["time_per_step_ms"] for lb in table]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+    for ax, ys in ((ax1, maes), (ax2, ms)):
+        ax.plot(
+            ws, ys,
+            color="black", linestyle="-", marker="o",
+            markersize=6, markerfacecolor="white", markeredgewidth=1.2,
+            linewidth=1.4,
+        )
+        ax.set_xscale("log")
+        ax.set_xticks(ws)
+        ax.set_xticklabels(ticks)
+        ax.minorticks_off()
+        ax.set_xlabel(xlab)
+        ax.grid(alpha=0.3, linestyle=":")
+    ax1.axhline(1.0, color="0.4", linestyle="--", linewidth=1.0,
+                label=base_label)
+    ax1.set_ylabel("MAE")
+    ax1.legend(loc="best", fontsize=9)
+    ax2.set_yscale("log")
+    ax2.set_ylabel("1ステップ当たり計算時間 [ms]" if jp
+                   else "time per step [ms]")
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+def run_w_sweep(
+    src,
+    B: float,
+    *,
+    windows: Sequence = (2, 3, 5, 10, 20, 30, 60),
+    include_full: bool = True,
+    start=None,
+    end=None,
+    tz: str | None = None,
+    grid_size: int = 11,
+    symmetric: bool = False,
+    title: str | None = None,
+    show: bool = True,
+):
+    """CSV → 平均練行足 → W スイープ（MAE＋計算時間）→ 2 パネル要約図.
+
+    ``run_mae_sweep`` の計時付き・図付き版。卒論 §7.2（参照期間 W に
+    対する感度分析）の表と図をこれ 1 つで作る。
+
+    Returns
+    -------
+    (fig, result)
+        result : {"x", "bricks", "N", "table"}（table は
+        ``sweep_by_window`` の返り値で，W ごとの予測列も含む）
+    """
+    df = load_tradingview_csv(src)
+    df = slice_by_time(df, start=start, end=end, tz=tz)
+    if isinstance(df.index, pd.DatetimeIndex) and len(df) > 0:
+        range_str = f"{df.index[0]} → {df.index[-1]}"
+    else:
+        range_str = f"rows [0, {len(df)})"
+    print(f"当てはめ範囲: {range_str}  (bars={len(df)})")
+
+    bricks, _ = generate_mean_renko_from_ohlc(df, B=B)
+    x = walk_from_bricks(bricks)
+    N = len(bricks)
+    print(f"N_bricks={N}, B={B}")
+    if N < 2:
+        raise ValueError(
+            f"ブリック数が少なすぎます (N={N})。B を小さくするか期間を広げてください。"
+        )
+
+    table = sweep_by_window(
+        x, windows, include_full=include_full,
+        grid_size=grid_size, symmetric=symmetric,
+    )
+    print_w_sweep(table)
+    fig = plot_w_sweep(table, N=N, title=title)
+    if show:
+        plt.show()
+    return fig, {"x": x, "bricks": bricks, "N": N, "table": table}
+
+
+def brick_stats(bricks: Sequence[int]) -> dict:
+    """練行足符号列の記述統計（卒論 §7.1・考察用）.
+
+    Returns
+    -------
+    dict
+        N（足の本数）, up_ratio（+1 の比率）,
+        reversal_rate（直前と逆符号になった遷移の比率 r̂）,
+        mean_run / max_run（同符号が連続する長さ＝連長の平均・最大）,
+        run_hist（連長の度数分布）。
+        ナイーブな「直前と同方向」予測の MAE は 2*reversal_rate になる。
+    """
+    b = [int(v) for v in bricks]
+    N = len(b)
+    if N < 2:
+        raise ValueError("bricks must contain at least 2 elements")
+    runs: list[int] = []
+    cur = 1
+    for prev, nxt in zip(b, b[1:]):
+        if nxt == prev:
+            cur += 1
+        else:
+            runs.append(cur)
+            cur = 1
+    runs.append(cur)
+    reversals = len(runs) - 1
+    return {
+        "N": N,
+        "up_ratio": sum(1 for v in b if v == 1) / N,
+        "reversal_rate": reversals / (N - 1),
+        "mean_run": N / len(runs),
+        "max_run": max(runs),
+        "run_hist": dict(sorted(Counter(runs).items())),
     }
