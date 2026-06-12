@@ -4,16 +4,25 @@
 （重複なし・連続）** のバッチに区切って，各区間の **生データ** をそのまま
 保存する。後から自由に再分析・再描画できるアーカイブを作るのが目的。
 
+参照期間（window）は本家 ``oyosuri_experiment.run_multi_w_overlay`` と
+同じく **1〜3 個まで選べる**。各要素は
+
+  - 整数 W       … 直近 W 本だけで当てはめる（rolling 窓）
+  - "full"/None  … その区間の全期間で当てはめる（第5章の元モデル）
+
 各バッチで保存する生データ（モデルの x_0 = 0 規約に合わせて再ゼロ化した
 「モデルフレーム」で揃える。絶対水準は manifest の ``base`` で復元できる）:
 
-  - n          … 区間内のブリック index 0..L（L = batch_size）
-  - x          … 実測ウォーク x_n（再ゼロ化済み，x_0 = 0）
-  - pred       … 1 ステップ先予測 x_n*（n=0 は NaN）
-  - p, q, alpha … その予測を出した最適化結果（n=0 は NaN）
+  - n            … 区間内のブリック index 0..L（L = batch_size）
+  - x            … 実測ウォーク x_n（再ゼロ化済み，x_0 = 0）
+  - pred_<W>     … 参照期間 <W> での 1 ステップ先予測 x_n*（n=0 は NaN）
+  - p_<W>, q_<W>, alpha_<W> … その予測を出した最適化結果（n=0 は NaN）
 
-さらに全区間を 1 行 = 1 区間でまとめた ``manifest.csv`` と，まとめて
-ダウンロードするための ``batches.zip`` を出力する。
+（``<W>`` は整数窓ならその数字，全期間なら ``full``。例: windows=[10, 30,
+"full"] → pred_10 / pred_30 / pred_full の 3 系列ぶんの列が並ぶ。）
+
+さらに全区間 × 各参照期間を 1 行 = 1 区間でまとめた ``manifest.csv`` と，
+まとめてダウンロードするための ``batches.zip`` を出力する。
 
 Colab での使い方:
 
@@ -28,12 +37,13 @@ Colab での使い方:
     from google.colab import files
     up = files.upload(); path = next(iter(up))
 
-    # 4) 150 本ずつ区切って全区間の生データを収集 → 保存
+    # 4) 150 本ずつ区切って，参照期間 10/30/全期間 の 3 系列で全区間を収集 → 保存
     batches, manifest = run_batch_collection(
         path, B=4, batch_size=150,
+        windows=[10, 30, "full"],     # 本家と同じく 1〜3 個（整数=rolling, "full"=全期間）
         out_dir="oyosuri_batches", symmetric=False,
     )
-    manifest          # 1 行 = 1 区間のサマリ表（DataFrame）
+    manifest          # 1 行 = 1 区間 × 各参照期間のサマリ表（DataFrame）
 
     # 5) 生成された zip をダウンロード
     from google.colab import files
@@ -74,6 +84,47 @@ from oyosuri_all_in_one import (
     slice_by_time,
     walk_from_bricks,
 )
+from oyosuri_rolling import predict_sequence_with_params_rolling
+
+
+# 本家 oyosuri_experiment と同じ「全期間参照」トークン。
+_FULL_TOKENS = ("full", "all", "∞", "inf")
+
+
+def _is_full(W) -> bool:
+    """W が「全期間参照」を意味するか（None / "full"/"all"/"inf" 等）."""
+    if W is None:
+        return True
+    if isinstance(W, str):
+        return W.strip().lower() in _FULL_TOKENS
+    return False
+
+
+def _label_for(W) -> str:
+    """列名・サマリ用のラベル（整数窓 → その数字, 全期間 → "full"）."""
+    return "full" if _is_full(W) else str(int(W))
+
+
+def _preds_params_for_window(
+    sub: Sequence[int],
+    W,
+    *,
+    grid_size: int,
+    symmetric: bool,
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """参照期間 ``W`` での予測列と (p*, q*, α*) 列を返す.
+
+    全期間（None / "full"）なら ``predict_sequence_with_params``、整数なら
+    直近 W 本の rolling 版 ``predict_sequence_with_params_rolling``。
+    どちらも (preds, ps, qs, alphas) の 4-tuple を返す。
+    """
+    if _is_full(W):
+        return predict_sequence_with_params(
+            sub, grid_size=grid_size, symmetric=symmetric
+        )
+    return predict_sequence_with_params_rolling(
+        sub, window=int(W), grid_size=grid_size, symmetric=symmetric
+    )
 
 
 def split_walk_into_batches(
@@ -107,54 +158,81 @@ def split_walk_into_batches(
     return out
 
 
+def _dedup_window_labels(windows: Sequence) -> list:
+    """1〜3 個の windows を，ラベル重複を除いて順序を保ったまま返す."""
+    ws = list(windows)
+    if not 1 <= len(ws) <= 3:
+        raise ValueError("windows は1〜3個（本家と同じく同時に最大3つ）")
+    out: list = []
+    seen: set[str] = set()
+    for W in ws:
+        label = _label_for(W)
+        if label in seen:
+            continue
+        seen.add(label)
+        out.append(W)
+    return out
+
+
 def collect_batch_data(
     x: Sequence[int],
     *,
     batch_size: int = 150,
+    windows: Sequence = (10, 30, "full"),
     grid_size: int = 11,
     symmetric: bool = False,
     drop_last: bool = True,
 ) -> list[dict]:
     """ウォーク ``x`` を区切り，各区間の生データ（dict）のリストを返す.
 
+    ``windows`` は参照期間（本家と同じく 1〜3 個）。各要素は整数 W（直近
+    W 本の rolling）または "full"/None（区間の全期間）。
+
     各 dict のキー:
       - ``batch_id``                  … 0 始まりの通し番号
       - ``start_brick`` / ``end_brick`` … 元ウォーク上のブリック index 範囲
       - ``n_bricks``                  … 区間のブリック本数（通常 batch_size）
       - ``base``                      … 再ゼロ化に使った絶対水準 x[start]
+      - ``labels``                    … 参照期間ラベルのリスト（例 ["10","30","full"]）
       - ``frame``                     … 区間生データの DataFrame
-                                        (列 n, x, pred, p, q, alpha)
-      - ``mae`` / ``rmse`` / ``hit``  … 区間内の予測評価（参考）
+                                        (列 n, x, 各 W ごとの pred/p/q/alpha)
+      - ``metrics``                   … {label: {"mae","rmse","hit"}}（参考）
 
     ``frame`` はモデルフレーム（x_0 = 0）で揃えてある。絶対水準に戻すには
     ``frame["x"] + base`` とすればよい。
     """
     x_list = list(x)
+    windows = _dedup_window_labels(windows)
     ranges = split_walk_into_batches(
         x_list, batch_size=batch_size, drop_last=drop_last
     )
+    nan = float("nan")
     batches: list[dict] = []
     for bid, (s, e) in enumerate(ranges):
         base = x_list[s]
         sub = [int(v - base) for v in x_list[s : e + 1]]  # 再ゼロ化（x_0=0）
-        preds, ps, qs, alphas = predict_sequence_with_params(
-            sub, grid_size=grid_size, symmetric=symmetric
-        )
         L = len(sub) - 1  # = e - s 本
+        actual = [float(v) for v in sub[1:]]
         # n=0..L で 1 枚の表に揃える。pred/p/q/alpha は予測ステップ n=1..L に
         # 対応するので先頭 n=0 は NaN で詰める。
-        nan = float("nan")
-        frame = pd.DataFrame(
-            {
-                "n": np.arange(L + 1),
-                "x": sub,
-                "pred": [nan] + list(preds),
-                "p": [nan] + list(ps),
-                "q": [nan] + list(qs),
-                "alpha": [nan] + list(alphas),
+        cols: dict[str, list] = {"n": list(np.arange(L + 1)), "x": sub}
+        labels: list[str] = []
+        metrics: dict[str, dict] = {}
+        for W in windows:
+            label = _label_for(W)
+            labels.append(label)
+            preds, ps, qs, alphas = _preds_params_for_window(
+                sub, W, grid_size=grid_size, symmetric=symmetric
+            )
+            cols[f"pred_{label}"] = [nan] + list(preds)
+            cols[f"p_{label}"] = [nan] + list(ps)
+            cols[f"q_{label}"] = [nan] + list(qs)
+            cols[f"alpha_{label}"] = [nan] + list(alphas)
+            metrics[label] = {
+                "mae": mae(actual, preds),
+                "rmse": rmse(actual, preds),
+                "hit": hit_rate(actual, preds),
             }
-        )
-        actual = [float(v) for v in sub[1:]]
         batches.append(
             {
                 "batch_id": bid,
@@ -162,10 +240,9 @@ def collect_batch_data(
                 "end_brick": e,
                 "n_bricks": e - s,
                 "base": float(base),
-                "frame": frame,
-                "mae": mae(actual, preds),
-                "rmse": rmse(actual, preds),
-                "hit": hit_rate(actual, preds),
+                "labels": labels,
+                "frame": pd.DataFrame(cols),
+                "metrics": metrics,
             }
         )
     return batches
@@ -174,27 +251,30 @@ def collect_batch_data(
 def build_manifest(batches: list[dict]) -> pd.DataFrame:
     """区間ごとの生データ list から 1 行 = 1 区間のサマリ表を作る.
 
-    p*, q*, α* は区間内（V_n が定数でない予測ステップ）の平均。
+    各参照期間 ``<label>`` ごとに mae_<label> / rmse_<label> / hit_<label> と，
+    区間内（V_n が定数でない予測ステップ）の平均 p_mean_<label> /
+    q_mean_<label> / alpha_mean_<label> を列に展開する。
     """
     rows = []
     for b in batches:
         f = b["frame"]
-        rows.append(
-            {
-                "batch_id": b["batch_id"],
-                "start_brick": b["start_brick"],
-                "end_brick": b["end_brick"],
-                "n_bricks": b["n_bricks"],
-                "base": b["base"],
-                "x_end": float(f["x"].iloc[-1]),       # 区間終端の到達点（再ゼロ）
-                "mae": b["mae"],
-                "rmse": b["rmse"],
-                "hit": b["hit"],
-                "p_mean": float(np.nanmean(f["p"])),
-                "q_mean": float(np.nanmean(f["q"])),
-                "alpha_mean": float(np.nanmean(f["alpha"])),
-            }
-        )
+        row = {
+            "batch_id": b["batch_id"],
+            "start_brick": b["start_brick"],
+            "end_brick": b["end_brick"],
+            "n_bricks": b["n_bricks"],
+            "base": b["base"],
+            "x_end": float(f["x"].iloc[-1]),       # 区間終端の到達点（再ゼロ）
+        }
+        for label in b["labels"]:
+            m = b["metrics"][label]
+            row[f"mae_{label}"] = m["mae"]
+            row[f"rmse_{label}"] = m["rmse"]
+            row[f"hit_{label}"] = m["hit"]
+            row[f"p_mean_{label}"] = float(np.nanmean(f[f"p_{label}"]))
+            row[f"q_mean_{label}"] = float(np.nanmean(f[f"q_{label}"]))
+            row[f"alpha_mean_{label}"] = float(np.nanmean(f[f"alpha_{label}"]))
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -240,6 +320,7 @@ def run_batch_collection(
     B: float,
     *,
     batch_size: int = 150,
+    windows: Sequence = (10, 30, "full"),
     start=None,
     end=None,
     tz: str | None = None,
@@ -260,6 +341,10 @@ def run_batch_collection(
         同じ期間からより多くの区間が取れる。
     batch_size :
         1 区間あたりのブリック本数（既定 150）。
+    windows :
+        参照期間（本家 ``run_multi_w_overlay`` と同じく 1〜3 個）。各要素は
+        整数 W（直近 W 本の rolling）または "full"/None（区間の全期間）。
+        例: [10, 30, "full"] / [20] / [10, 30, 60]。
     start, end, tz :
         当てはめ対象の時間範囲。``oyosuri_all_in_one.run_on_tradingview``
         と同義（DatetimeIndex なら文字列日時，通常 index なら行番号）。
@@ -276,7 +361,7 @@ def run_batch_collection(
     -------
     (batches, manifest)
         batches  : 区間ごとの生データ dict のリスト（``collect_batch_data``）。
-        manifest : 1 行 = 1 区間のサマリ表（DataFrame）。
+        manifest : 1 行 = 1 区間 × 各参照期間のサマリ表（DataFrame）。
     """
     df = load_tradingview_csv(src)
     df = slice_by_time(df, start=start, end=end, tz=tz)
@@ -288,6 +373,8 @@ def run_batch_collection(
         used_start, used_end = 0, len(df)
     print(f"当てはめ範囲: {range_str}  (bars={len(df)})")
 
+    windows = _dedup_window_labels(windows)
+    labels = [_label_for(W) for W in windows]
     bricks, _ = generate_mean_renko_from_ohlc(df, B=B)
     x = walk_from_bricks(bricks)
     N = len(bricks)
@@ -296,6 +383,7 @@ def run_batch_collection(
         f"N_bricks={N}, B={B}, batch_size={batch_size} "
         f"→ 非重複で {n_full} 区間（端数 {N - n_full * batch_size} 本）"
     )
+    print(f"参照期間: {labels}")
     if N < batch_size:
         raise ValueError(
             f"ブリック数 N={N} が batch_size={batch_size} 未満です。"
@@ -303,21 +391,23 @@ def run_batch_collection(
         )
 
     batches = collect_batch_data(
-        x, batch_size=batch_size, grid_size=grid_size,
+        x, batch_size=batch_size, windows=windows, grid_size=grid_size,
         symmetric=symmetric, drop_last=drop_last,
     )
     manifest = build_manifest(batches)
     print(f"収集した区間数: {len(batches)}")
-    print(
-        "MAE 平均 = "
-        f"{manifest['mae'].mean():.4f}  /  "
-        f"HIT 平均 = {manifest['hit'].mean():.4f}"
-    )
+    for label in labels:
+        print(
+            f"  [{label:>4}] MAE 平均 = "
+            f"{manifest[f'mae_{label}'].mean():.4f}  /  "
+            f"HIT 平均 = {manifest[f'hit_{label}'].mean():.4f}"
+        )
 
     if out_dir is not None:
         meta = {
             "B": B,
             "batch_size": batch_size,
+            "windows": [("full" if _is_full(W) else int(W)) for W in windows],
             "grid_size": grid_size,
             "symmetric": symmetric,
             "drop_last": drop_last,
@@ -360,6 +450,7 @@ if __name__ == "__main__":
 
     demo_df = _make_synthetic_xauusd(n_bars=4000, seed=0)
     batches, manifest = run_batch_collection(
-        demo_df, B=0.5, batch_size=150, out_dir="/tmp/oyosuri_batches_demo",
+        demo_df, B=0.5, batch_size=150, windows=[10, 30, "full"],
+        grid_size=7, out_dir="/tmp/oyosuri_batches_demo",
     )
     print(manifest.to_string(index=False))
