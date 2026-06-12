@@ -195,6 +195,7 @@ def run_all_patterns(
     grid_size: int = 11,
     symmetric: bool = False,
     save_dir: str | None = None,
+    fname_fmt: str = "pat_{pattern}_{k}.png",
     dpi: int = 150,
     show: bool = False,
     **gen_kwargs,
@@ -203,8 +204,10 @@ def run_all_patterns(
 
     ``seeds`` は全パターン共通のシーケンスか，``{パターン名: シーケンス}``
     の辞書（パターンごとに形の良い seed を選びたいとき）。
-    ``save_dir`` を指定すると ``pat_<pattern>_<k>.png``（k は 1 始まり）で
-    保存する。戻り値は ``{(pattern, seed): result}``。
+    ``save_dir`` を指定すると ``fname_fmt``（``{pattern}``・``{k}``・
+    ``{seed}`` を展開，k は 1 始まり）で保存する。卒論の図名に合わせる
+    なら seed 1 つ＋ ``fname_fmt="pat_{pattern}_w.png"``。
+    戻り値は ``{(pattern, seed): result}``。
     """
     results: dict[tuple[str, int], dict] = {}
     for pattern in PATTERNS:
@@ -219,7 +222,8 @@ def run_all_patterns(
             )
             results[(pattern, seed)] = res
             if save_dir is not None:
-                out = _os.path.join(save_dir, f"pat_{pattern}_{k}.png")
+                fname = fname_fmt.format(pattern=pattern, k=k, seed=seed)
+                out = _os.path.join(save_dir, fname)
                 fig.savefig(out, dpi=dpi, bbox_inches="tight")
                 print(f"saved: {out}")
             if not show:
