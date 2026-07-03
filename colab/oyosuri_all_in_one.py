@@ -446,11 +446,46 @@ _COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _read_csv_any_encoding(src) -> pd.DataFrame:
+    """エンコーディングを自動判別して CSV を読む.
+
+    UTF-8 以外（日本語環境のエクスポートに多い cp932 / UTF-16 等）でも
+    ``UnicodeDecodeError`` で落ちないように，
+      1. ローカルファイルなら先頭バイトの BOM で判別
+         （FF FE / FE FF → utf-16, EF BB BF → utf-8-sig）
+      2. 判別できなければ utf-8 → cp932 → utf-16 → latin-1 の順に試す
+    で読み込む。全て失敗したら最後の例外を再送出する。
+    """
+    from pathlib import Path as _Path
+
+    encodings = ["utf-8", "cp932", "utf-16", "latin-1"]
+    try:
+        is_file = _Path(str(src)).is_file()
+    except OSError:
+        is_file = False
+    if is_file:
+        with open(str(src), "rb") as f:
+            head = f.read(4)
+        if head[:2] in (b"\xff\xfe", b"\xfe\xff"):
+            encodings = ["utf-16"]
+        elif head[:3] == b"\xef\xbb\xbf":
+            encodings = ["utf-8-sig"]
+
+    last_err: Exception | None = None
+    for enc in encodings:
+        try:
+            return pd.read_csv(str(src), encoding=enc)
+        except (UnicodeDecodeError, UnicodeError) as e:
+            last_err = e
+    raise last_err
+
+
 def load_tradingview_csv(src) -> pd.DataFrame:
     """TradingView エクスポート CSV / DataFrame を正規化.
 
     対応入力:
       - str / pathlib.Path: CSV ファイルのパスまたは URL → pd.read_csv
+        （エンコーディングは utf-8 / cp932 / utf-16 等を自動判別）
       - pd.DataFrame: そのまま使う（コピー）
 
     列名は大文字小文字を無視して次のエイリアスで解決:
@@ -472,7 +507,7 @@ def load_tradingview_csv(src) -> pd.DataFrame:
     if isinstance(src, pd.DataFrame):
         raw = src.copy()
     else:
-        raw = pd.read_csv(str(src))
+        raw = _read_csv_any_encoding(src)
 
     # lower-case → original のマップを作る
     lower_map = {str(c).strip().lower(): c for c in raw.columns}

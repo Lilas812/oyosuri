@@ -72,6 +72,7 @@ if _HERE not in _sys.path:
 
 from oyosuri_all_in_one import (
     generate_mean_renko_from_ohlc,
+    hit_rate,
     load_tradingview_csv,
     mae,
     predict_sequence,
@@ -297,6 +298,7 @@ def run_multi_w_overlay(
     symmetric: bool = False,
     title: str | None = None,
     show: bool = True,
+    save_path: str | None = None,
 ):
     """CSV → 平均練行足 → 指定した参照期間の予測を実測と同一グラフに重ねて出力.
 
@@ -306,10 +308,15 @@ def run_multi_w_overlay(
       - windows=["full"]         … 全期間参照の予測1本だけ
       - windows=[10, 30, "full"] … 混在
 
+    MAE と方向的中率 HIT は図には載せず，ログに W | MAE | HIT の表で
+    出力する。``save_path`` を指定すると図を PNG として保存する
+    （Colab で ``fig.savefig`` を別途書かなくて済む）。
+
     Returns
     -------
     (fig, result)
-        result : {"x", "bricks", "N", "preds": {W: preds}, "mae": {W: MAE}}
+        result : {"x", "bricks", "N", "preds": {W: preds},
+                  "mae": {W: MAE}, "hit": {W: HIT}}
     """
     ws = list(windows)
     if not 1 <= len(ws) <= 3:
@@ -335,6 +342,7 @@ def run_multi_w_overlay(
 
     preds_by_w: dict[str, list[float]] = {}
     mae_by_w: dict[str, float] = {}
+    hit_by_w: dict[str, float] = {}
     for W in ws:
         label = "full" if _is_full(W, N) else str(int(W))
         if label in preds_by_w:
@@ -342,14 +350,23 @@ def run_multi_w_overlay(
         preds = _preds_for_window(x, W, grid_size=grid_size, symmetric=symmetric)
         preds_by_w[label] = preds
         mae_by_w[label] = mae(actual, preds)
+        hit_by_w[label] = hit_rate(actual, preds)
 
-    print("MAE (参考):", {k: round(v, 4) for k, v in mae_by_w.items()})
-    fig = plot_walk_multi_w(x, preds_by_w, mae_by_w=mae_by_w, title=title)
+    # 指標は図には載せず，ログに表で出す
+    print(f"{'W':>6} | {'MAE':>8} | {'HIT':>8}")
+    print("-" * 30)
+    for label in preds_by_w:
+        print(f"{label:>6} | {mae_by_w[label]:>8.4f} | {hit_by_w[label]:>8.4f}")
+
+    fig = plot_walk_multi_w(x, preds_by_w, title=title)
+    if save_path is not None:
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"図を保存: {save_path}")
     if show:
         plt.show()
     return fig, {
         "x": x, "bricks": bricks, "N": N,
-        "preds": preds_by_w, "mae": mae_by_w,
+        "preds": preds_by_w, "mae": mae_by_w, "hit": hit_by_w,
     }
 
 
