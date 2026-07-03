@@ -25,7 +25,9 @@
 **各区間の重ね図 PNG**（実測 x_n × 各参照期間の予測 x_n*，
 ``batch_0000.png`` …），まとめてダウンロードするための ``batches.zip``
 を出力する。描画は本家 ``oyosuri_experiment.plot_walk_multi_w`` を再利用
-する（実測＝黒太線，各系列＝○/□/△ の白抜きマーカー，凡例に MAE 併記）。
+する（実測＝黒太線，各系列＝○/□/△ の白抜きマーカー）。MAE と方向的中率
+HIT は図には載せず，実行時のログ（``print_batch_metrics`` の
+区間 × 参照期間の表）と ``manifest.csv`` に出力する。
 
 Colab での使い方:
 
@@ -297,15 +299,16 @@ def plot_batch(batch, *, title: str | None = None):
     """1 区間の実測 x_n と各参照期間の予測 x_n* を重ね図にして fig を返す.
 
     描画本体は本家 ``oyosuri_experiment.plot_walk_multi_w``（実測＝黒太線，
-    各系列＝○/□/△ の白抜きマーカー，凡例に MAE 併記）。
+    各系列＝○/□/△ の白抜きマーカー）。MAE や方向的中率 HIT は図には
+    載せず，ログ出力（``print_batch_metrics``）で確認する。
 
     Parameters
     ----------
     batch :
-        ``collect_batch_data`` が返す区間 dict（``frame`` / ``labels`` /
-        ``metrics`` 等を持つ），または保存済み ``batch_XXXX.csv`` を読み
-        戻した素の DataFrame。DataFrame の場合は ``pred_<label>`` 列名から
-        参照期間ラベルを自動検出し，MAE はその場で再計算する。
+        ``collect_batch_data`` が返す区間 dict（``frame`` / ``labels`` 等を
+        持つ），または保存済み ``batch_XXXX.csv`` を読み戻した素の
+        DataFrame。DataFrame の場合は ``pred_<label>`` 列名から参照期間
+        ラベルを自動検出する。
     title :
         図のタイトル。省略時は区間 dict なら
         ``batch 0003  bricks [450, 600)`` の形式，DataFrame ならタイトル無し。
@@ -314,12 +317,10 @@ def plot_batch(batch, *, title: str | None = None):
         frame = batch
         labels = [c[len("pred_"):] for c in frame.columns
                   if c.startswith("pred_")]
-        metrics = None
         default_title = None
     else:
         frame = batch["frame"]
         labels = batch["labels"]
-        metrics = batch.get("metrics")
         default_title = (
             f"batch {batch['batch_id']:04d}  "
             f"bricks [{batch['start_brick']}, {batch['end_brick']})"
@@ -327,21 +328,32 @@ def plot_batch(batch, *, title: str | None = None):
     if not labels:
         raise ValueError("pred_<label> 列が見つかりません")
     x = [float(v) for v in frame["x"]]
-    actual = x[1:]
     preds_by_w: dict[str, list[float]] = {}
-    mae_by_w: dict[str, float] = {}
     for label in labels:
         # 先頭 n=0 は NaN 詰め（予測は n=1..L に対応）なので落とす
-        preds = [float(v) for v in frame[f"pred_{label}"].iloc[1:]]
-        preds_by_w[label] = preds
-        if metrics is not None and label in metrics:
-            mae_by_w[label] = metrics[label]["mae"]
-        else:
-            mae_by_w[label] = mae(actual, preds)
+        preds_by_w[label] = [float(v) for v in frame[f"pred_{label}"].iloc[1:]]
     return plot_walk_multi_w(
-        x, preds_by_w, mae_by_w=mae_by_w,
+        x, preds_by_w,
         title=default_title if title is None else title,
     )
+
+
+def print_batch_metrics(batches: list[dict]) -> None:
+    """区間 × 参照期間ごとの MAE と方向的中率 HIT をログ出力する.
+
+    図（``plot_batch`` / ``save_batch_images``）には指標を載せない方針
+    なので，数値はこの表で確認する。``collect_batch_data`` が付けた
+    ``metrics``（mae / rmse / hit）をそのまま整形して表示する。
+    """
+    print(f"{'batch':>6} | {'W':>6} | {'MAE':>8} | {'HIT':>8}")
+    print("-" * 38)
+    for b in batches:
+        for label in b["labels"]:
+            m = b["metrics"][label]
+            print(
+                f"{b['batch_id']:>6d} | {label:>6} |"
+                f" {m['mae']:>8.4f} | {m['hit']:>8.4f}"
+            )
 
 
 def save_batch_images(
@@ -498,6 +510,7 @@ def run_batch_collection(
     )
     manifest = build_manifest(batches)
     print(f"収集した区間数: {len(batches)}")
+    print_batch_metrics(batches)
     for label in labels:
         print(
             f"  [{label:>4}] MAE 平均 = "
