@@ -22,13 +22,21 @@
 "full"] → pred_10 / pred_30 / pred_full の 3 系列ぶんの列が並ぶ。）
 
 さらに全区間 × 各参照期間を 1 行 = 1 区間でまとめた ``manifest.csv`` と，
-まとめてダウンロードするための ``batches.zip`` を出力する。
+**各区間の重ね図 PNG**（実測 x_n × 各参照期間の予測 x_n*，
+``batch_0000.png`` …），まとめてダウンロードするための ``batches.zip``
+を出力する。描画は本家 ``oyosuri_experiment.plot_walk_multi_w`` を再利用
+する（実測＝黒太線，各系列＝○/□/△ の白抜きマーカー）。MAE と方向的中率
+HIT は図には載せず，実行時のログ（``print_batch_metrics`` の
+区間 × 参照期間の表）と ``manifest.csv`` に出力する。
 
 Colab での使い方:
 
     # 1) クローンして colab/ を import パスに追加
     !git clone https://github.com/Lilas812/oyosuri.git
     import sys; sys.path.insert(0, "/content/oyosuri/colab")
+
+    # 1') 凡例の日本語（実測値/全期間）を表示したいとき一度だけ実行
+    !pip install -q matplotlib-fontja
 
     # 2) import（依存は自動解決）
     from oyosuri_batches import run_batch_collection
@@ -37,7 +45,8 @@ Colab での使い方:
     from google.colab import files
     up = files.upload(); path = next(iter(up))
 
-    # 4) 150 本ずつ区切って，参照期間 10/30/全期間 の 3 系列で全区間を収集 → 保存
+    # 4) 150 本ずつ区切って，参照期間 10/30/全期間 の 3 系列で全区間を収集
+    #    → CSV ＋ 区間ごとの重ね図 PNG を保存（make_images=True が既定）
     batches, manifest = run_batch_collection(
         path, B=4, batch_size=150,
         windows=[10, 30, "full"],     # 本家と同じく 1〜3 個（整数=rolling, "full"=全期間）
@@ -45,12 +54,18 @@ Colab での使い方:
     )
     manifest          # 1 行 = 1 区間 × 各参照期間のサマリ表（DataFrame）
 
-    # 5) 生成された zip をダウンロード
+    # 5) 生成された zip（CSV ＋ PNG 入り）をダウンロード
     from google.colab import files
     files.download("oyosuri_batches.zip")
 
-メモリ上に残った ``batches`` は区間ごとの DataFrame のリストなので，
-そのまま ``batches[0]`` 等で再描画・再分析できる。
+メモリ上に残った ``batches`` は区間ごとの生データ dict のリストなので，
+``plot_batch(batches[0])`` 等でその場で再描画できる。保存済みの
+``batch_XXXX.csv`` を ``load_saved_batches`` で読み戻した素の DataFrame
+もそのまま ``plot_batch`` に渡せる。
+
+区切らず **全期間を 1 枚の図** にしたいだけなら，本家
+``oyosuri_experiment.run_multi_w_overlay(path, B=4, windows=[10, 30, "full"])``
+＋ ``fig.savefig(...)`` を使う（本モジュールは不要）。
 """
 
 from __future__ import annotations
@@ -60,6 +75,7 @@ import shutil
 from pathlib import Path
 from typing import Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -84,6 +100,7 @@ from oyosuri_all_in_one import (
     slice_by_time,
     walk_from_bricks,
 )
+from oyosuri_experiment import plot_walk_multi_w
 from oyosuri_rolling import predict_sequence_with_params_rolling
 
 
@@ -278,17 +295,105 @@ def build_manifest(batches: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def plot_batch(batch, *, title: str | None = None):
+    """1 区間の実測 x_n と各参照期間の予測 x_n* を重ね図にして fig を返す.
+
+    描画本体は本家 ``oyosuri_experiment.plot_walk_multi_w``（実測＝黒太線，
+    各系列＝○/□/△ の白抜きマーカー）。MAE や方向的中率 HIT は図には
+    載せず，ログ出力（``print_batch_metrics``）で確認する。
+
+    Parameters
+    ----------
+    batch :
+        ``collect_batch_data`` が返す区間 dict（``frame`` / ``labels`` 等を
+        持つ），または保存済み ``batch_XXXX.csv`` を読み戻した素の
+        DataFrame。DataFrame の場合は ``pred_<label>`` 列名から参照期間
+        ラベルを自動検出する。
+    title :
+        図のタイトル。省略時は区間 dict なら
+        ``batch 0003  bricks [450, 600)`` の形式，DataFrame ならタイトル無し。
+    """
+    if isinstance(batch, pd.DataFrame):
+        frame = batch
+        labels = [c[len("pred_"):] for c in frame.columns
+                  if c.startswith("pred_")]
+        default_title = None
+    else:
+        frame = batch["frame"]
+        labels = batch["labels"]
+        default_title = (
+            f"batch {batch['batch_id']:04d}  "
+            f"bricks [{batch['start_brick']}, {batch['end_brick']})"
+        )
+    if not labels:
+        raise ValueError("pred_<label> 列が見つかりません")
+    x = [float(v) for v in frame["x"]]
+    preds_by_w: dict[str, list[float]] = {}
+    for label in labels:
+        # 先頭 n=0 は NaN 詰め（予測は n=1..L に対応）なので落とす
+        preds_by_w[label] = [float(v) for v in frame[f"pred_{label}"].iloc[1:]]
+    return plot_walk_multi_w(
+        x, preds_by_w,
+        title=default_title if title is None else title,
+    )
+
+
+def print_batch_metrics(batches: list[dict]) -> None:
+    """区間 × 参照期間ごとの MAE と方向的中率 HIT をログ出力する.
+
+    図（``plot_batch`` / ``save_batch_images``）には指標を載せない方針
+    なので，数値はこの表で確認する。``collect_batch_data`` が付けた
+    ``metrics``（mae / rmse / hit）をそのまま整形して表示する。
+    """
+    print(f"{'batch':>6} | {'W':>6} | {'MAE':>8} | {'HIT':>8}")
+    print("-" * 38)
+    for b in batches:
+        for label in b["labels"]:
+            m = b["metrics"][label]
+            print(
+                f"{b['batch_id']:>6d} | {label:>6} |"
+                f" {m['mae']:>8.4f} | {m['hit']:>8.4f}"
+            )
+
+
+def save_batch_images(
+    batches: list[dict],
+    out_dir,
+    *,
+    dpi: int = 150,
+) -> list[Path]:
+    """各区間の重ね図を ``out_dir/batch_XXXX.png`` として保存する.
+
+    ``batch_0000.csv`` と同じ連番で対応が取れる。図は保存後すぐ閉じる
+    （区間数が多くてもメモリを食わないように）。
+    """
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for b in batches:
+        fig = plot_batch(b)
+        path = out / f"batch_{b['batch_id']:04d}.png"
+        fig.savefig(path, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        paths.append(path)
+    print(f"{len(paths)} 枚の重ね図 PNG を {out}/ に保存しました。")
+    return paths
+
+
 def save_batches(
     batches: list[dict],
     out_dir,
     *,
     meta: dict | None = None,
     make_zip: bool = True,
+    make_images: bool = True,
+    dpi: int = 150,
 ) -> pd.DataFrame:
     """区間ごとの生データを ``out_dir`` に書き出す.
 
     出力:
       - ``out_dir/batch_0000.csv`` …各区間の生データ (n, x, pred, p, q, alpha)
+      - ``out_dir/batch_0000.png`` …各区間の重ね図（``make_images=True`` 時）
       - ``out_dir/manifest.csv``   …1 行 = 1 区間のサマリ表
       - ``out_dir/meta.json``      …収集条件 (B, batch_size, 期間 など)
       - ``out_dir.zip``            …上記をまとめた zip（``make_zip=True`` 時）
@@ -301,6 +406,8 @@ def save_batches(
     out.mkdir(parents=True, exist_ok=True)
     for b in batches:
         b["frame"].to_csv(out / f"batch_{b['batch_id']:04d}.csv", index=False)
+    if make_images:
+        save_batch_images(batches, out, dpi=dpi)
     manifest = build_manifest(batches)
     manifest.to_csv(out / "manifest.csv", index=False)
     if meta is not None:
@@ -329,6 +436,8 @@ def run_batch_collection(
     drop_last: bool = True,
     out_dir="oyosuri_batches",
     make_zip: bool = True,
+    make_images: bool = True,
+    dpi: int = 150,
 ) -> tuple[list[dict], pd.DataFrame]:
     """TradingView CSV → 平均練行足 → 150 本ずつ区切って区間生データを収集・保存.
 
@@ -356,6 +465,11 @@ def run_batch_collection(
         出力先ディレクトリ名。``None`` なら保存せずメモリ上の結果のみ返す。
     make_zip :
         True なら ``out_dir.zip`` も作る（Colab でまとめて DL する用）。
+    make_images :
+        True（既定）なら各区間の重ね図 ``batch_XXXX.png`` も保存する
+        （zip にも同梱される）。
+    dpi :
+        重ね図 PNG の解像度（既定 150）。
 
     Returns
     -------
@@ -396,6 +510,7 @@ def run_batch_collection(
     )
     manifest = build_manifest(batches)
     print(f"収集した区間数: {len(batches)}")
+    print_batch_metrics(batches)
     for label in labels:
         print(
             f"  [{label:>4}] MAE 平均 = "
@@ -416,8 +531,13 @@ def run_batch_collection(
             "fit_start": used_start,
             "fit_end": used_end,
             "tz": tz,
+            "make_images": make_images,
+            "dpi": dpi,
         }
-        save_batches(batches, out_dir, meta=meta, make_zip=make_zip)
+        save_batches(
+            batches, out_dir, meta=meta, make_zip=make_zip,
+            make_images=make_images, dpi=dpi,
+        )
 
     return batches, manifest
 
