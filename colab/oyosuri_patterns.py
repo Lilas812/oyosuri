@@ -10,7 +10,9 @@
 
 の ±1 ブリック列を **同一の長さ（既定 150 本）** で人工的に生成し，
 ``oyosuri_experiment`` と同じ体裁（実測＝太い黒実線，各系列＝実線＋
-○/□/△ マーカー，凡例に MAE 併記）で 1 ステップ先予測を重ね描きする。
+○/□/△ マーカー）で 1 ステップ先予測を重ね描きする。MAE と方向的中率
+HIT は図には載せず，実行時のログに W | MAE | HIT の表で出力する
+（本家 ``run_multi_w_overlay`` と同じ方針）。
 
 生成規則（実データの練行足の見た目に合わせた簡易モデル）:
 
@@ -33,7 +35,7 @@ Colab での使い方:
 
     from oyosuri_patterns import run_pattern_overlay, run_all_patterns
 
-    # 1枚だけ（上昇→下降，150本，w=10/30/60）
+    # 1枚だけ（上昇→下降，150本，w=2/10/60）
     fig, r = run_pattern_overlay("up2down", n_bricks=150, seed=0)
     fig.savefig("pat_up2down_1.png", dpi=150, bbox_inches="tight")
 
@@ -59,7 +61,7 @@ except NameError:  # __file__ が無い実行形態へのフォールバック
 if _HERE not in _sys.path:
     _sys.path.insert(0, _HERE)
 
-from oyosuri_all_in_one import mae, walk_from_bricks
+from oyosuri_all_in_one import hit_rate, mae, walk_from_bricks
 from oyosuri_experiment import _is_full, _preds_for_window, plot_walk_multi_w
 
 
@@ -136,7 +138,7 @@ def run_pattern_overlay(
     *,
     n_bricks: int = 150,
     seed: int = 0,
-    windows: Sequence = (10, 30, 60),
+    windows: Sequence = (2, 10, 60),
     grid_size: int = 11,
     symmetric: bool = False,
     title: str | None = None,
@@ -147,12 +149,13 @@ def run_pattern_overlay(
 
     ``windows`` の各要素は整数（直近 W 本）または "full"/None（全期間）。
     最大 3 つまで同一図に重ねる（体裁は ``run_multi_w_overlay`` と同じ）。
+    MAE と方向的中率 HIT は図には載せず，ログに W | MAE | HIT の表で出力する。
 
     Returns
     -------
     (fig, result)
         result : {"pattern", "seed", "x", "bricks", "N",
-                  "preds": {W: preds}, "mae": {W: MAE}}
+                  "preds": {W: preds}, "mae": {W: MAE}, "hit": {W: HIT}}
     """
     ws = list(windows)
     if not 1 <= len(ws) <= 3:
@@ -166,6 +169,7 @@ def run_pattern_overlay(
 
     preds_by_w: dict[str, list[float]] = {}
     mae_by_w: dict[str, float] = {}
+    hit_by_w: dict[str, float] = {}
     for W in ws:
         label = "full" if _is_full(W, N) else str(int(W))
         if label in preds_by_w:
@@ -173,17 +177,23 @@ def run_pattern_overlay(
         preds = _preds_for_window(x, W, grid_size=grid_size, symmetric=symmetric)
         preds_by_w[label] = list(preds)
         mae_by_w[label] = mae(actual, preds)
+        hit_by_w[label] = hit_rate(actual, preds)
 
-    print("MAE (参考):", {k: round(v, 4) for k, v in mae_by_w.items()})
+    # 指標は図には載せず，ログに表で出す
+    print(f"{'W':>6} | {'MAE':>8} | {'HIT':>8}")
+    print("-" * 30)
+    for label in preds_by_w:
+        print(f"{label:>6} | {mae_by_w[label]:>8.4f} | {hit_by_w[label]:>8.4f}")
+
     if title is None:
         title = f"{JP_TITLES[pattern]}（合成データ，N={N}）"
-    fig = plot_walk_multi_w(x, preds_by_w, mae_by_w=mae_by_w, title=title)
+    fig = plot_walk_multi_w(x, preds_by_w, title=title)
     if show:
         plt.show()
     return fig, {
         "pattern": pattern, "seed": seed,
         "x": x, "bricks": bricks, "N": N,
-        "preds": preds_by_w, "mae": mae_by_w,
+        "preds": preds_by_w, "mae": mae_by_w, "hit": hit_by_w,
     }
 
 
@@ -191,7 +201,7 @@ def run_all_patterns(
     *,
     n_bricks: int = 150,
     seeds: Sequence[int] | dict[str, Sequence[int]] = (0, 1),
-    windows: Sequence = (10, 30, 60),
+    windows: Sequence = (2, 10, 60),
     grid_size: int = 11,
     symmetric: bool = False,
     save_dir: str | None = None,
