@@ -225,28 +225,36 @@ def run_mae_sweep(
     return {"x": x, "bricks": bricks, "N": N, "mae": result}
 
 
-def plot_walk_multi_w(
+def draw_walk_multi_w(
+    ax,
     x: Sequence[int],
     preds_by_w: dict[str, Sequence[float]],
     *,
     mae_by_w: dict[str, float] | None = None,
     title: str | None = None,
-):
-    """実測ウォーク x_n と、最大3つの系列の予測 x_n* を同一図に重ねて返す.
+    jp: bool | None = None,
+    legend: bool = True,
+    legend_outside: bool = True,
+    markersize: float = 6.0,
+) -> None:
+    """実測ウォーク x_n と最大3系列の予測 x_n* を既存の ``ax`` に描く.
 
-    凡例は日本語（実測値／全期間／w=30）。白黒印刷でも判別できるよう、系列は
-    色ではなくマーカー形状で区別する（線はすべて実線。実測＝太い黒実線・
-    マーカー無し、各系列＝実線＋○/□/△ の白抜きマーカー）。判断はこの図を
-    目視で行い、凡例に補助の MAE を併記する。日本語フォントが無ければ英語に
-    自動フォールバックする。
+    ``plot_walk_multi_w`` の描画本体。複数の合成インスタンスを 1 枚の
+    グリッド図に並べたい（``oyosuri_patterns.run_pattern_gallery``）ときに，
+    各サブプロットへ直接描くために切り出した。体裁は従来と同一：
+    実測＝太い黒実線，各系列＝実線＋○/□/△ の白抜きマーカー，凡例に MAE。
+
+    ``jp`` を渡さなければ内部で日本語フォントの有無を判定する。
+    ``legend_outside`` が偽なら凡例を軸の内側（左上）に置く（小さな
+    サブプロットで軸外に凡例を出すと重なるため）。
     """
-    jp = _setup_jp_font()
+    if jp is None:
+        jp = _setup_jp_font()
     obs_label = "実測値" if jp else "observed"
     full_label = "全期間" if jp else "full"
 
     x = list(x)
     N = max(len(x) - 1, 0)
-    fig, ax = plt.subplots(figsize=(13, 5))
 
     walk_n = np.arange(len(x))
     ax.step(
@@ -270,7 +278,7 @@ def plot_walk_multi_w(
             color=grays[i % len(grays)],
             linestyle="-",
             marker=markers[i % len(markers)],
-            markersize=6, markerfacecolor="white", markeredgewidth=1.2,
+            markersize=markersize, markerfacecolor="white", markeredgewidth=1.2,
             markevery=me, linewidth=1.4, label=leg, zorder=3,
         )
 
@@ -280,8 +288,31 @@ def plot_walk_multi_w(
     ax.set_ylabel("$x_n$")
     ax.set_xlim(-0.5, max(N, 1) + 0.5)
     ax.grid(alpha=0.3, linestyle=":")
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9,
-              borderaxespad=0.0)
+    if legend:
+        if legend_outside:
+            ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9,
+                      borderaxespad=0.0)
+        else:
+            ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
+
+
+def plot_walk_multi_w(
+    x: Sequence[int],
+    preds_by_w: dict[str, Sequence[float]],
+    *,
+    mae_by_w: dict[str, float] | None = None,
+    title: str | None = None,
+):
+    """実測ウォーク x_n と、最大3つの系列の予測 x_n* を同一図に重ねて返す.
+
+    凡例は日本語（実測値／全期間／w=30）。白黒印刷でも判別できるよう、系列は
+    色ではなくマーカー形状で区別する（線はすべて実線。実測＝太い黒実線・
+    マーカー無し、各系列＝実線＋○/□/△ の白抜きマーカー）。判断はこの図を
+    目視で行い、凡例に補助の MAE を併記する。日本語フォントが無ければ英語に
+    自動フォールバックする。
+    """
+    fig, ax = plt.subplots(figsize=(13, 5))
+    draw_walk_multi_w(ax, x, preds_by_w, mae_by_w=mae_by_w, title=title)
     fig.tight_layout()
     return fig
 
