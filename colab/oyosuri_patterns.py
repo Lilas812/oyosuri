@@ -31,23 +31,19 @@ Colab での使い方:
     import sys; sys.path.insert(0, "/content/oyosuri/colab")
     !pip install -q matplotlib-fontja   # 凡例・タイトルの日本語表示
 
-    from oyosuri_patterns import (
-        run_pattern_overlay, run_all_patterns,
-        run_pattern_gallery, run_all_pattern_galleries,
-    )
+    from oyosuri_patterns import run_pattern_overlay, run_all_patterns
 
     # 1枚だけ（上昇→下降，150本，W=2/10/60）
     fig, r = run_pattern_overlay("up2down", n_bricks=150, seed=0)
     fig.savefig("pat_up2down_1.png", dpi=150, bbox_inches="tight")
 
-    # 4パターン × seed 2つ = 8枚を一括生成して保存
-    results = run_all_patterns(n_bricks=150, seeds=(0, 1), save_dir=".")
-
-    # 「同じパターンをもっと多く」見たいとき（コンタクトシート）:
-    #   1パターン 6 例を 1 枚のグリッド図に（W=2/10/60）
-    fig, res = run_pattern_gallery("uptrend", n_instances=6)
-    #   4パターンぶんを一括生成・保存（gallery_uptrend_w.png など）
-    galleries = run_all_pattern_galleries(n_instances=6, save_dir=".")
+    # 「同じパターンをもっと多く」：seed を増やすと 1 インスタンス＝1 枚で
+    # 別々に保存される（コンタクトシートにはまとめない）。
+    #   4パターン × seed 6つ = 24枚を一括生成して保存
+    results = run_all_patterns(
+        n_bricks=150, seeds=(0, 1, 2, 3, 4, 5),
+        fname_fmt="pat_{pattern}_seed{seed}_w.png", save_dir=".",
+    )
 """
 
 from __future__ import annotations
@@ -69,13 +65,7 @@ if _HERE not in _sys.path:
     _sys.path.insert(0, _HERE)
 
 from oyosuri_all_in_one import mae, walk_from_bricks
-from oyosuri_experiment import (
-    _is_full,
-    _preds_for_window,
-    _setup_jp_font,
-    draw_walk_multi_w,
-    plot_walk_multi_w,
-)
+from oyosuri_experiment import _is_full, _preds_for_window, plot_walk_multi_w
 
 
 # パターン名 → 局面の並び（2局面は前半/後半で半々）
@@ -244,138 +234,3 @@ def run_all_patterns(
             if not show:
                 plt.close(fig)
     return results
-
-
-def run_pattern_gallery(
-    pattern: str,
-    *,
-    n_instances: int = 6,
-    seeds: Sequence[int] | None = None,
-    n_bricks: int = 150,
-    windows: Sequence = (2, 10, 60),
-    ncols: int = 3,
-    grid_size: int = 11,
-    symmetric: bool = False,
-    title: str | None = None,
-    show: bool = True,
-    **gen_kwargs,
-):
-    """1 パターンの複数インスタンスを 1 枚のグリッド図（コンタクトシート）にまとめる.
-
-    同じパターン（例：上昇継続）でも乱数 seed を変えると別の形が出る。
-    それを ``n_instances`` 本ぶん生成し，各サブプロットに実測と
-    ``windows``（既定 W=2/10/60）の予測を重ねて並べる。1 枚を眺めるだけで
-    「同じパターンでも W ごとの追従の傾向がどれだけ安定しているか」を
-    まとめて目視できる。
-
-    Parameters
-    ----------
-    n_instances : 生成するインスタンス数（``seeds`` 未指定なら 0..n-1）。
-    seeds : 使う seed の並び（指定すると ``n_instances`` は無視）。
-    ncols : グリッドの列数。行数は自動。
-
-    Returns
-    -------
-    (fig, results)
-        results : [{"seed", "N", "mae": {W: MAE}}, ...]
-    """
-    if pattern not in PATTERNS:
-        raise ValueError(f"pattern must be one of {sorted(PATTERNS)}, got {pattern!r}")
-    ws = list(windows)
-    if not 1 <= len(ws) <= 3:
-        raise ValueError("windows は1〜3個（同一グラフに重ねるため最大3つ）")
-    if seeds is None:
-        seeds = list(range(n_instances))
-    else:
-        seeds = list(seeds)
-    if not seeds:
-        raise ValueError("seeds/n_instances が空です")
-
-    jp = _setup_jp_font()
-    ncols = max(1, min(ncols, len(seeds)))
-    nrows = -(-len(seeds) // ncols)  # 切り上げ
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(6.0 * ncols, 3.2 * nrows), squeeze=False,
-    )
-
-    results: list[dict] = []
-    for idx, seed in enumerate(seeds):
-        r, c = divmod(idx, ncols)
-        ax = axes[r][c]
-        bricks = make_pattern_bricks(pattern, n_bricks=n_bricks, seed=seed, **gen_kwargs)
-        x = walk_from_bricks(bricks)
-        N = len(bricks)
-        actual = [float(v) for v in x[1:]]
-
-        preds_by_w: dict[str, list[float]] = {}
-        mae_by_w: dict[str, float] = {}
-        for W in ws:
-            label = "full" if _is_full(W, N) else str(int(W))
-            if label in preds_by_w:
-                continue
-            preds = _preds_for_window(x, W, grid_size=grid_size, symmetric=symmetric)
-            preds_by_w[label] = list(preds)
-            mae_by_w[label] = mae(actual, preds)
-
-        draw_walk_multi_w(
-            ax, x, preds_by_w, mae_by_w=mae_by_w,
-            title=f"seed={seed}", jp=jp,
-            legend=(idx == 0), legend_outside=False, markersize=4.5,
-        )
-        results.append({"seed": seed, "N": N, "mae": mae_by_w})
-        print(f"  {pattern} seed={seed}: MAE="
-              f"{ {k: round(v, 3) for k, v in mae_by_w.items()} }")
-
-    # 余ったセルは消す
-    for idx in range(len(seeds), nrows * ncols):
-        r, c = divmod(idx, ncols)
-        axes[r][c].axis("off")
-
-    if title is None:
-        title = f"{JP_TITLES[pattern]}（合成データ {len(seeds)} 例，N={n_bricks}，W={'/'.join(str(w) for w in ws)}）"
-    fig.suptitle(title, fontsize=13)
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
-    if show:
-        plt.show()
-    return fig, results
-
-
-def run_all_pattern_galleries(
-    *,
-    n_instances: int = 6,
-    n_bricks: int = 150,
-    windows: Sequence = (2, 10, 60),
-    ncols: int = 3,
-    grid_size: int = 11,
-    symmetric: bool = False,
-    save_dir: str | None = None,
-    fname_fmt: str = "gallery_{pattern}_w.png",
-    dpi: int = 150,
-    show: bool = False,
-    **gen_kwargs,
-):
-    """4 パターンぶんのコンタクトシートを一括生成する.
-
-    ``save_dir`` を指定すると ``fname_fmt``（``{pattern}`` を展開）で保存する。
-    戻り値は ``{pattern: results}``（各 results は ``run_pattern_gallery`` の
-    2 要素目）。
-    """
-    out: dict[str, list[dict]] = {}
-    for pattern in PATTERNS:
-        print(f"=== {pattern} ({JP_TITLES[pattern]}) ===")
-        fig, res = run_pattern_gallery(
-            pattern,
-            n_instances=n_instances, n_bricks=n_bricks, windows=windows,
-            ncols=ncols, grid_size=grid_size, symmetric=symmetric,
-            show=show, **gen_kwargs,
-        )
-        out[pattern] = res
-        if save_dir is not None:
-            _os.makedirs(save_dir, exist_ok=True)
-            fname = fname_fmt.format(pattern=pattern)
-            path = _os.path.join(save_dir, fname)
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            print(f"saved: {path}")
-        if not show:
-            plt.close(fig)
-    return out
