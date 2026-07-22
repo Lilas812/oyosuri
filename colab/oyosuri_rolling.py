@@ -49,9 +49,10 @@ from oyosuri_all_in_one import (
     slice_by_time,
     walk_from_bricks,
 )
+from oyosuri_moments import get_moment_grid, minimize_Vn_from_moments
 
 
-def predict_sequence_with_params_rolling(
+def _predict_sequence_with_params_rolling_legacy(
     x_obs: Sequence[int],
     *,
     window: int,
@@ -59,21 +60,7 @@ def predict_sequence_with_params_rolling(
     symmetric: bool = False,
     tol: float = 1e-10,
 ) -> tuple[list[float], list[float], list[float], list[float]]:
-    """直近 ``window`` bricks だけを使って各ステップを fit する.
-
-    各ステップ ``n`` で
-
-        prefix = x_obs[max(0, n + 1 - window) : n + 1]
-
-    を取り、モデルが想定する ``x_0 = 0`` 規約に合わせて先頭値を引いて
-    再ゼロ化してから ``minimize_Vn`` を呼ぶ。予測値は元の絶対水準に戻す。
-
-    現在利用可能なステップ数が ``window`` 未満の区間では、その時点で
-    利用可能な全履歴を使う (= 序盤は従来版と同じ振る舞い)。
-
-    返り値は ``oyosuri_all_in_one.predict_sequence_with_params`` と同じく
-    ``(preds, ps, qs, alphas)`` の 4-tuple。
-    """
+    """高速版との一致確認用に保存した、従来のrolling実装."""
     if window < 1:
         raise ValueError("window must be >= 1")
     x_list = list(x_obs)
@@ -87,7 +74,7 @@ def predict_sequence_with_params_rolling(
         sub = x_list[start : n + 1]
         base = sub[0]
         sub_rezeroed = [int(v - base) for v in sub]
-        m = len(sub_rezeroed) - 1  # m + 1 = predict horizon in model frame
+        m = len(sub_rezeroed) - 1
         res = minimize_Vn(
             sub_rezeroed, grid_size=grid_size, symmetric=symmetric, tol=tol
         )
@@ -107,6 +94,121 @@ def predict_sequence_with_params_rolling(
         qs.append(sum(pt[1] for pt in res.argmins) / k)
         alphas.append(sum(pt[2] for pt in res.argmins) / k)
     return preds, ps, qs, alphas
+
+
+def _fit_rezeroed_with_moments(
+    sub_rezeroed: tuple[int, ...],
+    moments,
+    *,
+    tol: float,
+) -> tuple[float, float, float, float]:
+    """1つの再ゼロ化済み区間を旧版互換の規則でfitする."""
+    m = len(sub_rezeroed) - 1
+    res = minimize_Vn_from_moments(sub_rezeroed, moments, tol=tol)
+    if res.is_constant:
+        nan = float("nan")
+        return float(sub_rezeroed[-1]), nan, nan, nan
+
+    # 最小候補の判定だけを高速化する。最終期待値は従来関数で計算し、
+    # 丸め順まで従来版と同じに保つ。
+    expectations = [
+        expected_position(m + 1, p, q, a) for (p, q, a) in res.argmins
+    ]
+    pred_local = float(sum(expectations) / len(expectations))
+    k = len(res.argmins)
+    return (
+        pred_local,
+        sum(pt[0] for pt in res.argmins) / k,
+        sum(pt[1] for pt in res.argmins) / k,
+        sum(pt[2] for pt in res.argmins) / k,
+    )
+
+
+def predict_sequences_with_params_rolling(
+    x_obs: Sequence[int],
+    *,
+    windows: Sequence[int],
+    grid_size: int = 11,
+    symmetric: bool = False,
+    tol: float = 1e-10,
+) -> dict[int, tuple[list[float], list[float], list[float], list[float]]]:
+    """複数のrolling窓を、共通モーメント表を使ってまとめて計算する.
+
+    同じ再ゼロ化経路は窓間・ステップ間で再利用する。特に
+    ``windows=(10, 30, 60)`` の序盤に重複する全期間参照計算を一度だけにする。
+    """
+    ws = [int(w) for w in windows]
+    if not ws:
+        return {}
+    if any(w < 1 for w in ws):
+        raise ValueError("window must be >= 1")
+    # 重複窓を入力順のまま除く。
+    ws = list(dict.fromkeys(ws))
+    x_list = [int(v) for v in x_obs]
+    N = len(x_list) - 1
+    moments = get_moment_grid(max(ws), grid_size, symmetric)
+
+    rows: dict[int, list[list[float]]] = {
+        w: [[], [], [], []] for w in ws
+    }
+    fit_cache: dict[tuple[int, ...], tuple[float, float, float, float]] = {}
+
+    for n in range(N):
+        for window in ws:
+            start = max(0, n + 1 - window)
+            sub = x_list[start : n + 1]
+            base = sub[0]
+            key = tuple(v - base for v in sub)
+            fit = fit_cache.get(key)
+            if fit is None:
+                fit = _fit_rezeroed_with_moments(key, moments, tol=tol)
+                fit_cache[key] = fit
+            pred_local, p, q, alpha = fit
+            rows[window][0].append(pred_local + base)
+            rows[window][1].append(p)
+            rows[window][2].append(q)
+            rows[window][3].append(alpha)
+
+    return {
+        w: (values[0], values[1], values[2], values[3])
+        for w, values in rows.items()
+    }
+
+
+def predict_sequence_with_params_rolling(
+    x_obs: Sequence[int],
+    *,
+    window: int,
+    grid_size: int = 11,
+    symmetric: bool = False,
+    tol: float = 1e-10,
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """直近 ``window`` bricks だけを使って各ステップを高速にfitする.
+
+    各ステップ ``n`` で
+
+        prefix = x_obs[max(0, n + 1 - window) : n + 1]
+
+    を取り、モデルが想定する ``x_0 = 0`` 規約に合わせて先頭値を引いて
+    再ゼロ化してから ``minimize_Vn`` を呼ぶ。予測値は元の絶対水準に戻す。
+
+    現在利用可能なステップ数が ``window`` 未満の区間では、その時点で
+    利用可能な全履歴を使う (= 序盤は従来版と同じ振る舞い)。
+
+    返り値は ``oyosuri_all_in_one.predict_sequence_with_params`` と同じく
+    ``(preds, ps, qs, alphas)`` の 4-tuple。
+
+    数学的に同じ一次・二次モーメントで候補を絞り、最小候補は従来の
+    ``Vn_value`` で再確認する。最終期待値も従来の ``expected_position`` を
+    用いるため、グリッド・許容誤差・複数最小解の扱いは従来版と同じ。
+    """
+    return predict_sequences_with_params_rolling(
+        x_obs,
+        windows=[window],
+        grid_size=grid_size,
+        symmetric=symmetric,
+        tol=tol,
+    )[int(window)]
 
 
 def run_on_tradingview_rolling(
