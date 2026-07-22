@@ -480,42 +480,36 @@ def plot_w_sweep(
 ):
     """W スイープの 2 パネル要約図（左: MAE，右: 1ステップ当たり時間）を返す.
 
-    横軸は参照期間 W（対数軸）。"full"（全期間）は W=N の位置に置き，
-    目盛りラベルを「全期間」とする（``N`` 必須）。左パネルには
-    「変化なし」予測の基準 MAE=1 を破線で示す。白黒印刷を想定して
-    黒の白抜きマーカー＋実線で描く。
+    横軸は参照期間 W をカテゴリとして等間隔に並べる
+    （2, 3, 5, ... の目盛り間隔をすべて同じにする）。"full"（全期間）は
+    数値の W ではないため，最後のカテゴリとして置き，ラベルを「全期間」とする。
+    左パネルには「変化なし」予測の基準 MAE=1 を破線で示す。白黒印刷を
+    想定して黒の白抜きマーカー＋実線で描く。``N`` は後方互換のため受け取るが
+    描画位置には用いない。
     """
     jp = _setup_jp_font()
     full_label = "全期間" if jp else "full"
     xlab = "参照期間 $W$" if jp else "reference window $W$"
     base_label = "「変化なし」予測 (MAE=1)" if jp else "no-change (MAE=1)"
 
-    ws: list[float] = []
-    ticks: list[str] = []
-    for label in table:
-        if label == "full":
-            if N is None:
-                raise ValueError("table に 'full' を含む場合は N を指定する")
-            ws.append(float(N))
-            ticks.append(full_label)
-        else:
-            ws.append(float(int(label)))
-            ticks.append(label)
+    ticks: list[str] = [
+        (full_label if label == "full" else label) for label in table
+    ]
+    xs = list(range(len(ticks)))  # カテゴリを 0,1,2,… に等間隔で配置
     maes = [table[lb]["mae"] for lb in table]
     ms = [table[lb]["time_per_step_ms"] for lb in table]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
     for ax, ys in ((ax1, maes), (ax2, ms)):
         ax.plot(
-            ws, ys,
+            xs, ys,
             color="black", linestyle="-", marker="o",
             markersize=6, markerfacecolor="white", markeredgewidth=1.2,
             linewidth=1.4,
         )
-        ax.set_xscale("log")
-        ax.set_xticks(ws)
+        ax.set_xticks(xs)
         ax.set_xticklabels(ticks)
-        ax.minorticks_off()
+        ax.set_xlim(-0.4, len(xs) - 1 + 0.4)
         ax.set_xlabel(xlab)
         ax.grid(alpha=0.3, linestyle=":")
     ax1.axhline(1.0, color="0.4", linestyle="--", linewidth=1.0,
