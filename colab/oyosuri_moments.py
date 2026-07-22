@@ -176,8 +176,30 @@ def minimize_Vn_from_moments(
     x = [int(v) for v in x_obs]
     if not x:
         raise ValueError("x_obs must have at least one element")
-    n = len(x) - 1
     values = objective_values_from_moments(x, moments)
+    return minimize_Vn_from_values(x, values, moments, tol=tol)
+
+
+def minimize_Vn_from_values(
+    x_obs: Sequence[int],
+    values: np.ndarray,
+    moments: MomentGrid,
+    *,
+    tol: float = 1e-10,
+) -> OptResult:
+    """Apply legacy minimizer semantics to precomputed objective values.
+
+    ``predict_sequence`` uses this entry point so the objective can be updated
+    cumulatively from one prefix to the next instead of summing the whole
+    prefix again.
+    """
+    x = [int(v) for v in x_obs]
+    if not x:
+        raise ValueError("x_obs must have at least one element")
+    values = np.asarray(values, dtype=np.longdouble)
+    if values.shape != moments.p.shape:
+        raise ValueError("values shape does not match the moment grid")
+    n = len(x) - 1
     best_fast = np.min(values)
     worst_fast = np.max(values)
     spread_fast = worst_fast - best_fast
