@@ -592,6 +592,51 @@ def predict_sequence_with_params(
     return preds, ps, qs, alphas
 
 
+# Keep the original implementations as a regression oracle.  Public sequence
+# calls below use the cumulative-moment engine, while ``predict_next`` and the
+# mathematical core remain unchanged.
+_predict_sequence_legacy = predict_sequence
+_predict_sequence_with_params_legacy = predict_sequence_with_params
+
+
+def predict_sequence_with_params(
+    x_obs: Sequence[int],
+    *,
+    grid_size: int = 21,
+    symmetric: bool = False,
+    tol: float = 1e-10,
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """高速な全期間予測列と各ステップの (p*, q*, alpha*) を返す.
+
+    旧実装と同じグリッド・許容誤差・複数最小解処理を保ったまま、各prefixの
+    評価値を一次・二次モーメントから累積更新する。
+    """
+    from oyosuri_full import predict_sequence_with_params_full_fast
+
+    return predict_sequence_with_params_full_fast(
+        x_obs,
+        grid_size=grid_size,
+        symmetric=symmetric,
+        tol=tol,
+    )
+
+
+def predict_sequence(
+    x_obs: Sequence[int],
+    *,
+    grid_size: int = 21,
+    symmetric: bool = False,
+    tol: float = 1e-10,
+) -> list[float]:
+    """高速な全期間1ステップ先予測列を返す."""
+    return predict_sequence_with_params(
+        x_obs,
+        grid_size=grid_size,
+        symmetric=symmetric,
+        tol=tol,
+    )[0]
+
+
 def plot_price(
     df: pd.DataFrame,
     N: int,
