@@ -33,12 +33,17 @@ Colab での使い方:
 
     from oyosuri_patterns import run_pattern_overlay, run_all_patterns
 
-    # 1枚だけ（上昇→下降，150本，w=10/30/60）
+    # 1枚だけ（上昇→下降，150本，W=2/10/60）
     fig, r = run_pattern_overlay("up2down", n_bricks=150, seed=0)
     fig.savefig("pat_up2down_1.png", dpi=150, bbox_inches="tight")
 
-    # 4パターン × seed 2つ = 8枚を一括生成して保存
-    results = run_all_patterns(n_bricks=150, seeds=(0, 1), save_dir=".")
+    # 「同じパターンをもっと多く」：seed を増やすと 1 インスタンス＝1 枚で
+    # 別々に保存される（コンタクトシートにはまとめない）。
+    #   4パターン × seed 6つ = 24枚を一括生成して保存
+    results = run_all_patterns(
+        n_bricks=150, seeds=(0, 1, 2, 3, 4, 5),
+        fname_fmt="pat_{pattern}_seed{seed}_w.png", save_dir=".",
+    )
 """
 
 from __future__ import annotations
@@ -136,7 +141,7 @@ def run_pattern_overlay(
     *,
     n_bricks: int = 150,
     seed: int = 0,
-    windows: Sequence = (10, 30, 60),
+    windows: Sequence = (2, 10, 60),
     grid_size: int = 11,
     symmetric: bool = False,
     title: str | None = None,
@@ -191,7 +196,7 @@ def run_all_patterns(
     *,
     n_bricks: int = 150,
     seeds: Sequence[int] | dict[str, Sequence[int]] = (0, 1),
-    windows: Sequence = (10, 30, 60),
+    windows: Sequence = (2, 10, 60),
     grid_size: int = 11,
     symmetric: bool = False,
     save_dir: str | None = None,
