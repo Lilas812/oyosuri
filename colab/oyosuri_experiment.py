@@ -79,7 +79,10 @@ from oyosuri_all_in_one import (
     slice_by_time,
     walk_from_bricks,
 )
-from oyosuri_rolling import predict_sequence_with_params_rolling
+from oyosuri_rolling import (
+    predict_sequence_with_params_rolling,
+    predict_sequences_with_params_rolling,
+)
 
 
 _FULL_TOKENS = ("full", "all", "∞", "inf")
@@ -343,11 +346,30 @@ def run_multi_w_overlay(
     preds_by_w: dict[str, list[float]] = {}
     mae_by_w: dict[str, float] = {}
     hit_by_w: dict[str, float] = {}
+
+    rolling_windows = list(dict.fromkeys(
+        int(W) for W in ws if not _is_full(W, N)
+    ))
+    rolling_results = (
+        predict_sequences_with_params_rolling(
+            x,
+            windows=rolling_windows,
+            grid_size=grid_size,
+            symmetric=symmetric,
+        )
+        if rolling_windows
+        else {}
+    )
     for W in ws:
         label = "full" if _is_full(W, N) else str(int(W))
         if label in preds_by_w:
             continue
-        preds = _preds_for_window(x, W, grid_size=grid_size, symmetric=symmetric)
+        if label == "full":
+            preds = predict_sequence(
+                x, grid_size=grid_size, symmetric=symmetric
+            )
+        else:
+            preds = rolling_results[int(W)][0]
         preds_by_w[label] = preds
         mae_by_w[label] = mae(actual, preds)
         hit_by_w[label] = hit_rate(actual, preds)
