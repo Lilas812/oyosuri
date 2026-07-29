@@ -1,14 +1,38 @@
 \documentclass[a4j,dvipdfmx]{jsarticle}
 
 \usepackage[dvipdfmx]{graphicx}
-\usepackage{amsmath}
+\usepackage{amsmath,amssymb}
 \usepackage{ascmac, fancybox}
 \usepackage{./exp5}
-
+\usepackage[dvipdfmx]{pdfpages}
 \usepackage{tikz}
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{amsthm}
+
+% 画像ファイルが無い場合でもコンパイルを止めないためのマクロ。
+% 拡張子を省略した画像名についても pdf/png/jpg/jpeg の順に確認する。
+\newcommand{\safeincludegraphics}[2][]{%
+  \IfFileExists{#2}{%
+    \includegraphics[#1]{#2}%
+  }{\IfFileExists{#2.pdf}{%
+    \includegraphics[#1]{#2.pdf}%
+  }{\IfFileExists{#2.png}{%
+    \includegraphics[#1]{#2.png}%
+  }{\IfFileExists{#2.jpg}{%
+    \includegraphics[#1]{#2.jpg}%
+  }{\IfFileExists{#2.jpeg}{%
+    \includegraphics[#1]{#2.jpeg}%
+  }{%
+    \fbox{%
+      \begin{minipage}[c][45mm][c]{0.9\linewidth}
+        \centering
+        画像未配置\\[2mm]
+        \texttt{\detokenize{#2}}
+      \end{minipage}%
+    }%
+  }}}}}%
+}
 
 % 定理見出し：名前と文献番号を丸括弧なしで併記するスタイル
 \newtheoremstyle{plainnote}%
@@ -27,9 +51,16 @@
 
 
 %%
-%  ここから本文
-%%
 \begin{document}
+
+\includepdf[
+  pages=1,
+  pagecommand={\thispagestyle{empty}},
+  fitpaper=true
+]{cover.pdf}
+
+\setcounter{page}{1}
+
 \section{序論}
 
 \subsection{背景}
@@ -217,7 +248,7 @@ $\binom{n}{\ell} p^\ell q^m$ で与えられる。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{rw_transition}
+  \safeincludegraphics[width=\textwidth]{rw_transition}
   \caption{ランダムウォークの遷移と確率}
   \label{fig:rw_transition}
 \end{figure}
@@ -241,7 +272,7 @@ $\binom{n}{\ell} p^\ell q^m$ で与えられる。
 図\,\ref{fig:rw_barchart} に示す。
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{rw_barchart.png}
+  \safeincludegraphics[width=\textwidth]{rw_barchart.png}
   \caption{対称ランダムウォーク（$p=q=\frac{1}{2}$）における時刻 $n=1,2,3,4$ の確率分布}
   \label{fig:rw_barchart}
 \end{figure}
@@ -253,7 +284,7 @@ $\binom{n}{\ell} p^\ell q^m$ で与えられる。
 本節では，1次元ランダムウォークに関する代表的な極限定理を紹介する。
 まず，以下の\textbf{大数の法則}が成り立つ。
 
-\begin{theorem}[大数の法則~{\cite{ref1}}]
+\begin{theorem}[大数の法則~{\cite{refbook}}]
 \label{thm:lln}
 \begin{equation}
   P\!\left(\lim_{n \to \infty} \frac{S_n}{n} = q - p\right) = 1
@@ -264,7 +295,7 @@ $\binom{n}{\ell} p^\ell q^m$ で与えられる。
 
 さらに，以下の\textbf{中心極限定理}が成り立つ。
 
-\begin{theorem}[中心極限定理~{\cite{ref1}}]
+\begin{theorem}[中心極限定理~{\cite{refbook}}]
 \label{thm:clt}
 $pq \neq 0$ とする。このとき $-\infty < a < b < \infty$ に対し，
 \begin{equation}
@@ -308,7 +339,7 @@ $-\infty < a < b < \infty$ に対し，
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.75\textwidth]{normal_limit_distribution}
+  \safeincludegraphics[width=0.75\textwidth]{normal_limit_distribution}
   \caption{ランダムウォークの極限測度（標準正規分布）}
   \label{fig:normal}
 \end{figure}
@@ -497,7 +528,7 @@ $Q = \bigl(\begin{smallmatrix}0&0\\c&d\end{smallmatrix}\bigr)$ を用いる。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{crw_transition}
+  \safeincludegraphics[width=\textwidth]{crw_transition}
   \caption{相関付きランダムウォークの遷移と確率}
   \label{fig:crw_transition}
 \end{figure}
@@ -512,7 +543,7 @@ $Q = \bigl(\begin{smallmatrix}0&0\\c&d\end{smallmatrix}\bigr)$ を用いる。
 の場合の確率分布を図\,\ref{fig:crw_barchart} に示す。
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{crw_barchart}
+  \safeincludegraphics[width=\textwidth]{crw_barchart}
   \caption{相関付きランダムウォーク（$a=d=2/3,\ \alpha=\beta=1/2$）における時刻 $n=1,2,3,4$ の確率分布}
   \label{fig:crw_barchart}
 \end{figure}
@@ -538,7 +569,8 @@ $Q = \bigl(\begin{smallmatrix}0&0\\c&d\end{smallmatrix}\bigr)$ を用いる。
 一度動き出した向きにそのまま進んで両端に到達しやすいことを反映している。
 この傾向は時刻が進むほど蓄積し，時刻 $n=3,4$ と進むにつれて，
 相関付きランダムウォークの分布は通常のランダムウォークの分布よりも
-中央が低く，裾が広い（より分散の大きい）形になっていく。
+中央が低く，中心から離れた位置の確率が大きい形
+（裾の広い，より分散の大きい分布）になっていく。
 このように，図\,\ref{fig:rw_barchart} と図\,\ref{fig:crw_barchart} を比べると，
 左右の移動回数が同じ経路でも順序によって確率が変わるという
 相関付きランダムウォークの性質が，分布の広がりの違いとして現れることがわかる。
@@ -569,7 +601,7 @@ $P(\tilde{S}_n = x) = P(\tilde{S}_n = -x)$ が成立し，確率測度は原点�
 
 確率測度が原点まわりで対称となる条件について，次がいえる。
 
-\begin{proposition}[{\cite{ref1}}]
+\begin{proposition}[{\cite{refbook}}]
 \label{prop:symmetry}
 \eqref{eq:sym_corr_matrix} で定まる時間発展対称な相関付きランダムウォーク $(\tilde{S}_n)_{n \geq 0}$ について，次が成り立つ。
 \begin{enumerate}
@@ -607,7 +639,7 @@ $a = 1/2$ のとき，コイン行列は
 
 時間発展対称な相関付きランダムウォークについて，以下の弱収束極限定理が成り立つ。
 
-\begin{theorem}[相関付きランダムウォークの弱収束極限定理~{\cite{ref2}}]
+\begin{theorem}[相関付きランダムウォークの弱収束極限定理~{\cite{refbook}}]
 \label{thm:clt_corr}
 \eqref{eq:sym_corr_matrix} で定まる時間発展対称な相関付きランダムウォーク $(\tilde{S}_n)_{n \geq 0}$ に対し，$n \to \infty$ とすると
 \begin{equation}
@@ -647,7 +679,7 @@ $N(0,1)$（破線，系\,\ref{cor:clt_sym}）とともに
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\textwidth]{crw_hist_n100}
+  \safeincludegraphics[width=0.85\textwidth]{crw_hist_n100}
   \caption{持続性（$a=2/3$）と反転傾向（$a=1/3$）の相関付きランダムウォークの分布（$n=100$）と標準正規分布の比較}
   \label{fig:crw_hist_n100}
 \end{figure}
@@ -875,13 +907,13 @@ $\mu_{n+1}(x;p_n^\ast,q_n^\ast,\alpha_n^\ast)=0$ とする。
 解析では，連続的に変動する価格系列をそのまま扱うのではなく，
 一定の値幅ごとに上昇・下降を判定し，
 $\{-1,+1\}$ の離散的な系列へ変換する。
-これにより，価格変動を相関付きランダムウォークの枠組みで扱える形にする。以降,このようにして得られたデータ列を平均連行足と呼ぶ。
+これにより，価格変動を相関付きランダムウォークの枠組みで扱える形にする。以降，このようにして得られたデータ列を平均練行足と呼ぶ。
 
 \subsection{データの構成}
 
 本研究で用いる原データは，XAUUSD の価格系列である。
-ここで，XAUUSD とは，金（Gold）と米ドル（US Dollar）の通貨ペアを表す記号であり，
-1 オンスあたりの金価格を米ドル建てで示したものである。
+ここで，XAUUSD とは，金価格を米ドルで表す取引記号であり，
+金1トロイオンス（約31.1\,g）当たりの米ドル価格を示す。
 金は国際的に取引される代表的な貴金属であり，
 XAUUSD はインフレや地政学的リスクを反映する指標として，
 投資判断やリスク管理の場面で広く参照されている。
@@ -998,7 +1030,7 @@ $b_i=-1$ は価格が下方向へ $B$ だけ動いたことを表す。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{linechart_renko_compare}
+  \safeincludegraphics[width=\textwidth]{linechart_renko_compare}
   \caption{価格系列から平均練行足への変換例}
   \label{fig:linechart_renko_compare}
 \end{figure}
@@ -1019,7 +1051,8 @@ $W$ を系統的に変えたときの予測誤差と計算時間の変化を
 主実験として調べる（\ref{subsec:w_sweep}節以降）。
 本実験で調整するパラメータは，この参照期間 $W$ のみである。
 
-用いる原データは XAUUSD の1分足価格系列である。
+用いる原データは，XAUUSD の1分ごとの始値，高値，安値，終値を記録した
+1分足データである。
 実験には目的に応じて複数の区間を用いるが，本章の主実験では代表として
 2026年6月29日23時22分から同月30日4時38分（UTC，1分足317本）の区間を対象とする。
 値幅 $B$ は，離散化後も値動きの特徴（トレンドや持ち合いの形）が失われないよう，
@@ -1089,8 +1122,7 @@ $W$ を系統的に変えたときの予測誤差と計算時間の変化を
 であった。
 MAE は「変化なし」予測の基準値 $1$ の約 $6$ 倍であり，
 HIT は方向を無作為に選ぶ予測の基準値 $0.5$ をも下回る。
-すなわち，全期間参照のモデルは誤差・方向のいずれの観点でも
-自明な基準予測に劣り，このままでは金価格の値動きの予測として妥当性が低い。
+以上から，全期間参照のモデルは，MAE と HIT の両方で基準予測を下回った。
 
 % ★図の差し替え待ち：実測 x_n と全期間参照の予測 x_n* の重ね図（実データ）。
 % 生成方法: run_multi_w_overlay(path, B=3, windows=["full"]) の図，または
@@ -1098,20 +1130,34 @@ HIT は方向を無作為に選ぶ予測の基準値 $0.5$ をも下回る。
 % に full_baseline_overlay.png として置き，以下のコメントを外す。
 % 図が入ったら，直前の段落に「予測と実測の乖離のようす（図参照）」への言及を加える。
 \begin{figure}[H]\centering
- \includegraphics[width=\textwidth]{batch_0000}
+ \safeincludegraphics[width=\textwidth]{overlay_full}
  \caption{実測 $x_n$ と全期間参照による予測 $x_n^{\ast}$ の重ね描き}
  \label{fig:full_baseline_overlay}
 \end{figure}
 
+また，各時刻までの全観測を用いて評価関数を最小化したときの
+推定パラメータ $p^{\ast},q^{\ast},\alpha^{\ast}$ の推移を
+図\,\ref{fig:full_baseline_params} に示す。
+推定値は探索格子上の値であり，最小値を与える組が複数存在する場合には，
+それらの各成分の相加平均を表示している。
+
+\begin{figure}[H]
+  \centering
+  \safeincludegraphics[width=\textwidth]{params_full.png}
+  \caption{全期間参照における推定パラメータ
+  $p^{\ast},q^{\ast},\alpha^{\ast}$ の推移}
+  \label{fig:full_baseline_params}
+\end{figure}
+
 この失敗の原因は，次のように考えられる。
-全期間参照による当てはめは，系列全体が単一のパラメータ $(p,q,\alpha)$ から
-定常に生成されているという仮定に相当する。
-しかし実際の値動きは，上昇・下降・持ち合いといった局面が切り替わる
-非定常な系列であり，既に終わった局面の観測が推定に混入し続けるため，
+全期間参照による当てはめは，系列全体が単一のパラメータ $(p,q,\alpha)$ から生成され，
+値動きの性質が時間によって変わらない定常な系列であると仮定することに相当する。
+しかし実際の値動きは，上昇，下降，持ち合いなどの状態が
+時間とともに変化する非定常な系列であり，既に終わった局面の観測が推定に混入し続けるため，
 現在の局面に対する予測が系統的にずれていく
 （機構の詳細は第8章で考察する）。
 
-そこで以下では，当てはめに用いる観測を\textbf{直近 $W$ 点に限る}
+そこで以下では，当てはめに用いる観測を直近 $W$ 点に限る
 という改良を加え，この参照期間 $W$ が予測性能をどう変えるかを調べる。
 
 \subsection{参照期間の導入}\label{subsec:rolling}
@@ -1138,7 +1184,7 @@ $y_0,\ldots,y_{W-1}$ は第5章の観測データの規約（式\eqref{eq:model_
   E(\tilde{S}_{W}\mid p^\ast,q^\ast,\alpha^\ast)
   \label{eq:rolling_prediction}
 \end{equation}
-と定める。最小解が複数ある場合,$V$ が定数の場合の扱いは，
+と定める。最小解が複数ある場合，$V$ が定数の場合の扱いは，
 式\eqref{eq:model_prediction_multiple}・式\eqref{eq:model_prediction_const} と同様である。
 序盤の $n<W-1$ では，その時点で利用できる全履歴 $D_n$ を用いる。
 また，参照期間を区切らず $D_n$ 全体を用いる場合，
@@ -1163,15 +1209,15 @@ $y_0,\ldots,y_{W-1}$ は第5章の観測データの規約（式\eqref{eq:model_
 $W$ とともに概ね単調に増加して全期間で最大となった
 （例外は $W=20$ から $W=30$ にかけての小さな逆転のみである）。
 計算時間は $W$ に対して単調に増加した。
-したがって，\textbf{小さい参照期間が誤差・計算時間の両面で優位であり，
-精度と計算量のあいだのトレードオフは観測されなかった}。
+したがって，小さい参照期間が誤差・計算時間の両面で優位であり，
+精度と計算量のあいだのトレードオフは観測されなかった。
 MAE が「変化なし」予測の基準値 $1$ を下回るのは $W=2$（$0.847$）と
 $W=3$（$0.979$）のみであった。
 
 計算時間が $W$ とともに増加することは，モデルの構造からも説明できる。
 1 回の予測では，格子上の $1331$ 点それぞれについて
 確率分布の時間発展（式\eqref{eq:crw_evolution}）を $W-1$ ステップ計算するため，
-1 ステップ当たりの計算量は $W$ の増加に伴いおよそ 2 乗のオーダーで増える
+1 ステップ当たりの計算量は，おおむね $W$ の2乗に比例して増える
 （時刻 $t$ の分布の台が $2t+1$ 点に広がるため）。
 全期間では参照長が $n$ とともに増えるので，系列全体では更に大きくなる。
 分布の計算を時刻間で使い回すなどの実装上の工夫により定数倍の改善は可能だが，
@@ -1189,7 +1235,7 @@ $W=3$（$0.979$）のみであった。
 \end{table}
 
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{w_sweep_summary}
+  \safeincludegraphics[width=\textwidth]{w_sweep_summary}
   \caption{参照期間 $W$ に対する MAE（左）と 1 ステップ当たり計算時間（右）。
   左図の破線は「変化なし」予測の基準 $\mathrm{MAE}=1$ を表す。}
   \label{fig:w_sweep}
@@ -1199,7 +1245,10 @@ $W=3$（$0.979$）のみであった。
 
 前節の表は誤差を集計した値であり，
 予測がどのような場面で当たり，どのような場面で外れているかまでは分からない。
-そこで評価の中心である視認比較として，
+ここで，価格が明確な上昇または下降の傾向を示さず，
+一定の値幅の中で上下を繰り返す持ち合いの状態を，
+本研究ではレンジ局面とよぶ。
+そこで評価の中心である図による比較として，
 参照期間の小・中・大を代表する $W=2,\,10,\,60$ の 3 通りについて，
 予測値 $x_n^{\ast}$ を実測値 $x_n$ と同一図に重ねた結果を
 図\,\ref{fig:w_overlay} に示す
@@ -1212,7 +1261,8 @@ $W=2$ の予測は，直前の値動きをなぞる形で実測値のごく近�
 $W=10$ もこれに近い軌跡を描いた。
 一方 $W=60$ の予測は，レンジから上昇へ移る局面ではレンジ局面の情報を引きずって
 実測値の下に取り残され，
-天井をすぎて下降へ転じる局面では逆に上昇の傾きを引きずって実測値の上方へ乖離した。
+上昇から下降へ転じる高値を過ぎた局面では，
+逆に上昇の傾きを引きずって実測値の上方へ乖離した。
 このような局面の変わり目ごとに生じる乖離の累積が，
 前節で見た「$W$ が大きいほど MAE が大きい」という傾向に対応している。
 
@@ -1220,7 +1270,7 @@ $W=10$ もこれに近い軌跡を描いた。
 % colab/oyosuri_experiment.py の run_multi_w_overlay(..., windows=[2,10,60]) で差し替える。
 % 実データで点数が多く見にくい場合は代表的な区間の抜粋に差し替えてもよい。
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{w_overlay}
+  \safeincludegraphics[width=\textwidth]{w_overlay}
   \caption{実測 $x_n$ と $W=2,10,60$ の予測の重ね描き}
   \label{fig:w_overlay}
 \end{figure}
@@ -1231,16 +1281,16 @@ $W=10$ もこれに近い軌跡を描いた。
 本節では，この $W$ による差が値動きのどのような局面で生じるのかを調べる。
 本モデルは値動きの上昇方向と下降方向を対称に扱うため，
 下降局面における予測は対応する上昇局面の予測を上下反転したものとなる。
-そこで上昇局面のライフサイクルに対応する次の4パターンを代表例として取り上げる。
+そこで，値動きの違いを見るため，次の4パターンを代表例として取り上げる。
 
 実データから局面を切り出すと，区間ごとに足の本数が揃わず比較が難しい。
 そこで本節では，実データの練行足の見た目に合わせた簡易な確率モデルを用いて，
-長さを $N=150$ 本に揃えた\textbf{合成データ}の符号列を各パターンについて生成し，
+長さを $N=150$ 本に揃えた合成データの符号列を各パターンについて生成し，
 これに対する予測の振る舞いを調べる。
 生成規則は次のとおりである。
 トレンド局面では，直前と同じ方向を確率 $0.70$ で継続し，
 逆方向にいる場合は確率 $0.58$ でトレンド方向へ引き戻される
-（1 本当たり平均約 $+0.3$ のドリフトをもつ）。
+（1本当たり平均約 $+0.3$ だけ上昇する傾向をもつ）。
 レンジ局面では，局面開始時の水準 $x_{\mathrm{a}}$ への平均回帰
 $P(\text{上昇})=0.5-0.09\,(x_n-x_{\mathrm{a}})$
 （ただし $0.12$〜$0.88$ に制限）に従い，おおよそ $\pm 5$ 本の帯にとどまる。
@@ -1258,20 +1308,21 @@ $P(\text{上昇})=0.5-0.09\,(x_n-x_{\mathrm{a}})$
 $W=60$ では MAE が $4.247$ まで悪化した。
 上昇という大きな方向が同じでも，経路が曲がるたびに大きい $W$ の乖離が蓄積することがわかる。
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{pat_uptrend_w}
+  \safeincludegraphics[width=\textwidth]{pat_uptrend_w}
   \caption{上昇継続：実測 $x_n$ と $W=2,10,60$ の予測（合成データ）}
   \label{fig:pat_uptrend}
 \end{figure}
 
 \subsubsection*{レンジ→上昇}
 図\,\ref{fig:pat_range2up} に示す。
-レンジ局面では方向の持続が乏しいため，順張り的に振る舞う小さい $W$ の優位は小さく，
+レンジ局面では方向の持続が乏しいため，
+直前の値動きと同じ方向を予測するように振る舞う小さい $W$ の優位は小さく，
 $W=2$（MAE $1.082$）と $W=10$（MAE $1.124$）はほぼ同等で，
 いずれも基準値 $1$ をわずかに上回った。
 一方，終盤の上昇への転換では $W=60$ の予測が立ち上がりに乗り遅れて
 実測値の下に取り残され，区間全体では MAE $2.442$ と差が開いた。
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{pat_range2up_w}
+  \safeincludegraphics[width=\textwidth]{pat_range2up_w}
   \caption{レンジ→上昇：実測 $x_n$ と $W=2,10,60$ の予測（合成データ）}
   \label{fig:pat_range2up}
 \end{figure}
@@ -1282,7 +1333,7 @@ $W=2$（MAE $1.082$）と $W=10$（MAE $1.124$）はほぼ同等で，
 レンジ入り後もしばらく実測値の上方へ乖離を続けた（$W=60$ で MAE $2.963$）。
 $W=2$ は数本で持ち合いに対応し，MAE は $0.996$ と基準値 $1$ をわずかに下回った。
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{pat_up2range_w}
+  \safeincludegraphics[width=\textwidth]{pat_up2range_w}
   \caption{上昇→レンジ：実測 $x_n$ と $W=2,10,60$ の予測（合成データ）}
   \label{fig:pat_up2range}
 \end{figure}
@@ -1290,12 +1341,13 @@ $W=2$ は数本で持ち合いに対応し，MAE は $0.996$ と基準値 $1$ �
 \subsubsection*{上昇→下降}
 図\,\ref{fig:pat_up2down} に示す。
 上昇から下降へ転じる局面では $W$ による差が4パターン中で最も大きい。
-$W=60$ の予測は天井を過ぎたあとも長く上昇方向の予測を出し続け，
+$W=60$ の予測は上昇から下降へ転じる高値を過ぎたあとも
+長く上昇方向の予測を出し続け，
 実測値から大きく乖離した（MAE $4.876$）。
 $W=2$ は反転から数本で下降方向へ切り替わり，
 MAE は $0.892$ と4パターン中で最小であった。
 \begin{figure}[H]\centering
-  \includegraphics[width=\textwidth]{pat_up2down_w}
+  \safeincludegraphics[width=\textwidth]{pat_up2down_w}
   \caption{上昇→下降：実測 $x_n$ と $W=2,10,60$ の予測（合成データ）}
   \label{fig:pat_up2down}
 \end{figure}
@@ -1327,10 +1379,7 @@ MAE ほど明確な差は現れなかった。
 「変化なし」予測の基準値 $1$ の約 $6$ 倍に達した。
 参照期間 $W$ を導入すると誤差は $W$ が小さいほど小さく，
 最小の $W=2$ のとき最良（$\mathrm{MAE}=0.847$）となり，
-この順序は，局面別の合成データを（乱数の種を変えて）作り直しても保たれる，
-安定して現れる傾向であった。
-本章では，この「参照期間は短いほどよい」という一見逆説的な結果が
-本モデルのどのような構造から生じるのかをまず検討し，
+本章では，この結果が生じた理由を本モデルの構造から検討し，
 そのうえで「$W=2$ が最良」という結果の意味を批判的に整理する。
 なお，方向的中率 HIT が $W$ によらずおおむね $1/2$ 前後にとどまるのは，
 \ref{subsec:patterns}節で見たように，練行足の符号列そのものが方向をあまり持続させず，
@@ -1341,35 +1390,22 @@ MAE ほど明確な差は現れなかった。
 
 本モデルの予測値（式\eqref{eq:rolling_prediction}）は，
 参照期間の先頭 $x_{n-W+1}$ を出発点とし，
-そこから $W$ 歩進んだ先の「平均的な到達点」を答える，という構成になっている。
-ここで平均的な到達点とは，次のようにして出てくる値である。
-まずモデルは，参照期間内の値動きにいちばんよく合うパラメータ $(p,q,\alpha)$ を
-評価関数の最小化によって選ぶ。
-そのパラメータをもつ相関付きランダムウォークは，
-$t$ 歩後に位置 $x$ にいる確率 $\mu_t(x)$（式\eqref{eq:model_mu}）を与えるので，
-予測値はこの確率分布の平均（重心）を出発点 $x_{n-W+1}$ に足したものになる。
+そこから $W$ 歩進んだ位置の期待値を求める構成になっている。
+参照期間内の観測値は評価関数に含まれているため，
+パラメータ $(p,q,\alpha)$ の推定には使われている。
 
-問題は，この見積もりが出発点から $W$ 歩ぶんもある点である。
-たとえば $W=60$ であれば，$60$ 本前の地点を起点として $60$ 歩先を見積もることになるが，
-そのうち手前の $59$ 歩は，すでに $x_{n-W+1}\to\cdots\to x_n$ という
-実際の値動きとして観測済みである。
-本来なら残る $1$ 歩，すなわち現在位置 $x_n$ から次の $x_{n+1}$ への $1$ 歩だけを
-見積もればよい。
-ところがモデルはこの観測済みの途中経過を予測に使わず，
-$60$ 歩すべてをまとめて確率的な平均で置き換えてしまう。
-その結果，いま値がどこにあるか（現在位置 $x_n$）も，
-直前がどちら向きに動いたかも，予測に反映されない。
-言いかえれば，予測は「いまの状況を手がかりにしない平均値」になっている。
+しかし，推定したパラメータから期待値を求めるときには，
+実際の現在位置 $x_n$ や直前の移動方向を条件としていない。
+たとえば $W=60$ の場合，参照期間の先頭から現在までの $59$ 歩は
+すでに観測されているが，予測では参照期間の先頭から $60$ 歩進んだ位置の
+期待値を改めて計算している。
+したがって，現在位置や直前の方向はパラメータ推定を通して間接的には影響するが，
+期待値の計算には直接使われていない。
 
-これは，直近の実測値を出発点として次の $1$ 歩だけを見積もる場合と比べ，
-見積もりの対象となる区間そのものが長いことを意味する。
-実際の値動きは毎回この平均のまわりに散らばるので，
-出発点が遠く，見積もる歩数が多いほど，実際の経路が平均からずれる余地は大きくなる
-（ずれの幅は，見る歩数のおよそ平方根に比例して増える）。
-したがって，$W$ が大きいほど MAE が増加するという結果（表\,\ref{tab:w_sweep}）は，
-当てはめのばらつきといった偶然の要因よりも前に，
-\textbf{遠い過去を起点として長い区間を見積もる}という
-予測の作りそのものから生じる，ある程度避けられない性質であると考えられる。
+$W$ が大きいほど予測の出発点は現在位置から遠くなり，
+期待値を求める歩数も多くなる。
+このことが，$W$ の増加とともに MAE が大きくなった一因であると考えられる
+（表\,\ref{tab:w_sweep}）。
 
 \subsection{局面の混在と転換への追従の遅れ}\label{subsec:disc_mix}
 
@@ -1401,19 +1437,17 @@ $W=2$（MAE $1.082$）と $W=10$（MAE $1.124$）の差はほとんど生じな�
 $W=2$ の予測は，出発点が現在にごく近い直前の位置となるため，
 \ref{subsec:disc_mech}節で述べた，遠い起点から長い区間を見積もることによる乖離を受けにくい。
 その一方でこの設定は，参照期間が直近の $1$ 本しか含まないために
-本モデルが備えるはずの局面推定の機能を最も使っていない。
+過去の値動きを参照する効果をほとんど利用していない。
 すなわち $W=2$ が最良であったことは，モデルが局面を捉えた成果ではなく，
 履歴を参照するほど誤差を上乗せする本モデルの構造のもとで，
 参照量を最も絞ることで悪化を最小にとどめた結果と見るべきである。
 
 なお，この短い $W$ の優位も普遍ではなく，
 方向の持続が乏しいレンジ主体の局面では失われる（\ref{subsec:patterns}節）。
-それでも，小さい $W$ では予測が値動きの継続・転換に短い遅れで追従しており
-（\ref{subsec:w_overlay}節），
-練行足化と相関付きランダムウォークによって
-金価格の短期的な方向の持続を捉えること自体は確認できた。
-これが本モデルの妥当性の範囲であり，
-長い履歴を活かす仕組みをもたないこと，その帰結として転換局面に弱いことが限界である。
+小さい $W$ では予測値と実測値の乖離が比較的小さく，
+特に $W=2$ では「変化なし」予測を下回る MAE が得られた。
+一方，HIT はおおむね $0.5$ 前後であり，
+次の値動きの方向を安定して予測できたとはいえない。
 \newpage
 \section{今後の課題}
 
@@ -1421,14 +1455,46 @@ $W=2$ の予測は，出発点が現在にごく近い直前の位置となる�
 
 \begin{itemize}
   \item \textbf{現在位置・直前の方向を条件とする予測への拡張}：
-        本モデルの誤差の主因は，予測がいまの状況を手がかりにしない平均値で作られる点にあった。
+        観測経路は評価関数によるパラメータ推定には用いられているが，
+        推定後の期待値は現在位置や直前の方向で条件づけられていない。
         時刻 $n$ の位置と向きを条件とした条件付き期待値
         $E(\tilde{S}_{n+1}\mid \tilde{S}_n=x_n,\ \text{直前の向き})$
         を予測値に用いる定式化に改めれば，
         参照期間を延ばしたときの劣化を抑えられる可能性がある。
 
+  \item \textbf{他の金融資産への適用}：
+        本研究で扱った対象は金価格（XAUUSD）の一つの時間帯に限られている。
+        株価，為替，暗号資産，金以外の商品などにも同じ手法を適用し，
+        資産ごとの値動きの性質によって予測結果がどのように変化するかを
+        比較する必要がある。
+
+  \item \textbf{平均練行足を用いないデータへの拡張}：
+        本研究では，価格系列を平均練行足によって増分 $\pm1$ の系列に変換した。
+        原価格や一定時間ごとの価格変化に直接適用するためには，
+        移動幅が一定でない系列を扱えるようにモデルが取り得る値の範囲や評価関数を拡張する，
+        または平均練行足とは異なる離散化方法を導入する必要がある。
+        これにより，本研究の結果が平均練行足への変換にどの程度依存するかも検証できる。
+
+  \item \textbf{他の確率モデルとの比較}：
+        同じデータに対して，現在の状態から次の状態への移り方を確率で表すマルコフ連鎖，
+        直前の1本だけでなく，複数本前までの値動きを考慮したモデル，
+        局面の切り替わりを表現するモデルなどを適用し，
+        MAE，HITおよび計算時間を本モデルと比較する必要がある。
+        その比較により，相関付きランダムウォークを用いる利点と限界を
+        より明確にできると考えられる。
+
 \end{itemize}
 
+
+\newpage
+\section*{謝辞}
+
+本研究を進めるにあたり，終始丁寧なご指導をいただきました
+愛媛大学工学部工学科応用数理研究室の安藤和典教授，
+森岡悠准教授に心より感謝申し上げます。
+また，本論文の審査をお引き受けいただきました
+乗松真二准教授，宇戸寿幸准教授に深く感謝申し上げます。
+ここに記して，以上の皆様に感謝の意を表します。
 
 \newpage
 \begin{thebibliography}{9}
@@ -1439,15 +1505,221 @@ $W=2$ の予測は，出発点が現在にごく近い直前の位置となる�
   Quantum Studies: Mathematics and Foundations, \textbf{6}, 61--72 (2019).
   % DOI: 10.1007/s40509-018-0162-1
 
-\bibitem{ref1}
-  % TODO: 書誌情報を記入（第3章の大数の法則・中心極限定理で参照した教科書）
-  著者名，『書名』，出版社（出版年）．
-
-\bibitem{ref2}
-  % TODO: 書誌情報を記入（第4章の相関付きランダムウォークの弱収束極限定理で参照した文献）
-  著者名，論文題目，誌名，\textbf{巻}，頁（出版年）．
+\bibitem{refbook}
+  今野紀雄，『量子ウォークによる時系列解析』，日本評論社（2020）．
 
 \end{thebibliography}
 \newpage
-\section{付録}
+\appendix
+\section{ボックス幅別の全期間参照結果}
+\label{app:full_by_B}
+
+本編では，対象区間の値動きの特徴を失わないように
+ボックス幅を $B=3$ ドルと定めた。
+ここでは補足資料として，ボックス幅を
+$B=2,3,4,5$ ドルと変えた場合について，
+同一期間の平均練行足を生成し，
+全期間参照による予測を行った結果を示す。
+
+対象としたのは，2026年6月15日7時01分から
+6月16日5時57分まで（日本時間）である。
+元の1分足データは1377本であり，
+各ボックス幅から得られた練行足の本数は
+表\ref{tab:app_full_summary}のとおりである。
+
+\begin{table}[H]
+  \centering
+  \caption{ボックス幅別の全期間参照結果}
+  \label{tab:app_full_summary}
+  \begin{tabular}{c|r|c|c}
+    \hline
+    ボックス幅 $B$ & 練行足本数 $N$ & MAE & HIT \\
+    \hline
+    2 & 772 & 8.1349 & 0.4786 \\
+    3 & 365 & 4.6812 & 0.5110 \\
+    4 & 202 & 3.1845 & 0.4677 \\
+    5 & 132 & 2.8220 & 0.4122 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+ボックス幅が小さいほど，同じ価格変動から生成される練行足の本数は多くなる。
+以下では，各ボックス幅について，
+実測値と全期間参照による予測値の重ね描きと，
+各時点で推定されたパラメータ
+$p^{\ast},q^{\ast},\alpha^{\ast}$を示す。
+
+\subsection{$B=2$ ドル}
+
+\begin{figure}[H]
+  \centering
+  \safeincludegraphics[width=\textwidth]
+    {overlay_2026-06-15_B2_full.png}
+
+  \vspace{5mm}
+
+  \safeincludegraphics[width=\textwidth]
+    {params_2026-06-15_B2_full.png}
+
+  \caption{$B=2$ ドルにおける全期間参照の結果。
+  上：実測値と予測値，下：推定パラメータ}
+  \label{fig:app_full_b2}
+\end{figure}
+
+\subsection{$B=3$ ドル}
+
+\begin{figure}[H]
+  \centering
+  \safeincludegraphics[width=\textwidth]
+    {overlay_2026-06-15_B3_full.png}
+
+  \vspace{5mm}
+
+  \safeincludegraphics[width=\textwidth]
+    {params_2026-06-15_B3_full.png}
+
+  \caption{$B=3$ ドルにおける全期間参照の結果。
+  上：実測値と予測値，下：推定パラメータ}
+  \label{fig:app_full_b3}
+\end{figure}
+
+\subsection{$B=4$ ドル}
+
+\begin{figure}[H]
+  \centering
+  \safeincludegraphics[width=\textwidth]
+    {overlay_2026-06-15_B4_full.png}
+
+  \vspace{5mm}
+
+  \safeincludegraphics[width=\textwidth]
+    {params_2026-06-15_B4_full.png}
+
+  \caption{$B=4$ ドルにおける全期間参照の結果。
+  上：実測値と予測値，下：推定パラメータ}
+  \label{fig:app_full_b4}
+\end{figure}
+
+\subsection{$B=5$ ドル}
+
+\begin{figure}[H]
+  \centering
+  \safeincludegraphics[width=\textwidth]
+    {overlay_2026-06-15_B5_full.png}
+
+  \vspace{5mm}
+
+  \safeincludegraphics[width=\textwidth]
+    {params_2026-06-15_B5_full.png}
+
+  \caption{$B=5$ ドルにおける全期間参照の結果。
+  上：実測値と予測値，下：推定パラメータ}
+  \label{fig:app_full_b5}
+\end{figure}
+
+\section{$B=2$ における150ステップごとの結果}
+\label{app:b2_chunk150}
+
+同じ期間から得られた $B=2$ ドルの練行足772本に対して，
+参照期間を $W=10,30,60$ とした予測を行った。
+予測自体は1日分の系列に対して連続して計算し，
+結果を比較しやすくするため，図では150ステップごとの区間に分けて表示した。
+最後の $n=751$ から $772$ までの区間は22ステップしかなく，
+他の区間と長さが異なるため，ここでは掲載しない。
+各区間の MAE と HIT を表\ref{tab:app_b2_chunk150}に示す。
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{$B=2$ における150ステップごとの MAE と HIT}
+  \label{tab:app_b2_chunk150}
+  \begin{tabular}{c|c|ccc|ccc}
+    \hline
+    & & \multicolumn{3}{c|}{MAE} & \multicolumn{3}{c}{HIT} \\
+    区間 & ステップ $n$ & $W=10$ & $W=30$ & $W=60$
+      & $W=10$ & $W=30$ & $W=60$ \\
+    \hline
+    1 & 1--150   & 1.4570 & 2.5487 & 3.6464 & 0.4765 & 0.4295 & 0.3960 \\
+    2 & 151--300 & 1.4569 & 1.7235 & 2.7351 & 0.4899 & 0.5302 & 0.4832 \\
+    3 & 301--450 & 1.0659 & 1.6581 & 3.3320 & 0.5906 & 0.5235 & 0.4497 \\
+    4 & 451--600 & 1.2012 & 1.5630 & 2.8382 & 0.5503 & 0.5503 & 0.4564 \\
+    5 & 601--750 & 1.3992 & 1.5826 & 2.4881 & 0.4899 & 0.5436 & 0.4765 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+MAE は5区間すべてで $W=10$ のときに最も小さかった。
+一方，HIT は区間によって最も高い $W$ が異なり，
+参照期間を変えても一貫した傾向は見られなかった。
+以下では，各区間を1ページずつ用い，
+実測値と予測値の重ね描き，$W=10,30,60$ の推定パラメータの順に，
+4枚の図を上から縦に示す。
+
+% #1：表示するステップ範囲
+% #2：画像ファイル名に用いるステップ範囲
+% #3：図のラベルに用いる区間番号
+\newcommand{\chunkresultpage}[3]{%
+  \clearpage
+  \begin{figure}[H]
+    \centering
+
+    \par\noindent
+    \makebox[\textwidth][c]{実測値と予測値（$n=#1$）}
+    \par\vspace{1mm}
+    \safeincludegraphics[
+      width=0.98\textwidth,
+      height=0.19\textheight,
+      keepaspectratio
+    ]{overlay_B2_#2_W10_W30_W60.png}
+
+    \par\vspace{2mm}
+    \makebox[\textwidth][c]{推定パラメータ（$W=10$）}
+    \par\vspace{1mm}
+    \safeincludegraphics[
+      width=0.98\textwidth,
+      height=0.18\textheight,
+      keepaspectratio
+    ]{params_B2_#2_W10.png}
+
+    \par\vspace{2mm}
+    \makebox[\textwidth][c]{推定パラメータ（$W=30$）}
+    \par\vspace{1mm}
+    \safeincludegraphics[
+      width=0.98\textwidth,
+      height=0.18\textheight,
+      keepaspectratio
+    ]{params_B2_#2_W30.png}
+
+    \par\vspace{2mm}
+    \makebox[\textwidth][c]{推定パラメータ（$W=60$）}
+    \par\vspace{1mm}
+    \safeincludegraphics[
+      width=0.98\textwidth,
+      height=0.18\textheight,
+      keepaspectratio
+    ]{params_B2_#2_W60.png}
+
+    \caption{$B=2$，$n=#1$ における予測結果と推定パラメータ}
+    \label{fig:app_b2_chunk#3}
+  \end{figure}
+}
+\chunkresultpage{1-150}{steps_0001_0150}{1}
+\chunkresultpage{151-300}{steps_0151_0300}{2}
+\chunkresultpage{301-450}{steps_0301_0450}{3}
+\chunkresultpage{451-600}{steps_0451_0600}{4}
+\chunkresultpage{601-750}{steps_0601_0750}{5}
+
+
+
+
+
+\clearpage
+
+% 卒論チェックシートを最後に挿入
+\includepdf[
+  pages=-,
+  fitpaper=true,
+  pagecommand={\thispagestyle{empty}}
+]{thesis_check_sheet.pdf}
+
 \end{document}
