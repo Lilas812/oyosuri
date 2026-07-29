@@ -1,0 +1,63 @@
+# 卒業論文発表スライド
+
+相関付きランダムウォークモデルを用いた時系列解析（7分・16:9・日本語）の
+発表用 beamer スライドです。
+
+- `presentation.tex` … スライド本体（各フレームに発表者ノート `\note{}` 付き）
+- `figures/` … スライドで使用する図（本文 `docs/thesis/` からコピー）
+
+## 構成（全10テーマ＋表紙・結び）
+
+1. 表紙
+2. 研究の背景と目的
+3. ランダムウォークと相関付きランダムウォーク（定義）
+4. 相関付きランダムウォークの性質：極限分布
+5. 相関付きランダムウォークによる時系列予測モデル
+6. 金価格データの離散化：平均練行足
+7. 実験①：全期間参照とその失敗
+8. 実験②：参照期間 W の導入と効果
+9. モデルの限界：局面転換への追従の遅れ
+10. まとめと今後の課題
+11. 結び（ご清聴ありがとうございました）
+
+## コンパイル方法（日本語 upLaTeX + dvipdfmx）
+
+本文 `docs/thesis/main.tex` と同じ pLaTeX 系のワークフローです。
+ファイルは UTF-8 で保存してください。
+
+```sh
+cd docs/slides
+uplatex  presentation.tex     # 1回目
+uplatex  presentation.tex     # 総ページ数・相互参照の確定のため2回目
+dvipdfmx presentation.dvi     # presentation.pdf を生成
+```
+
+`platex` でもコンパイルできます。`latexmk` を使う場合は次の `.latexmkrc` を置くと
+`latexmk presentation.tex` の一発で PDF まで生成できます。
+
+```perl
+$latex    = 'uplatex -synctex=1 -halt-on-error -interaction=nonstopmode %O %S';
+$dvipdf   = 'dvipdfmx %O -o %D %S';
+$pdf_mode = 3;   # dvi -> pdf (dvipdfmx)
+```
+
+## 発表者ノートの出し方
+
+各フレーム直後の `\note{...}` が発表原稿（合計の目安 約7分）です。既定では
+スライドのみが出力されます。ノートを出力するには、プリアンブル末尾にある
+次の行のコメントを外してから再コンパイルしてください。
+
+```tex
+% ノートページをスライドの後ろに挿入
+\setbeameroption{show notes}
+
+% 発表者ビュー（左：スライド／右：ノート）
+\setbeameroption{show notes on second screen=right}
+```
+
+## 図の差し替え
+
+`figures/` 内の PNG を置き換えるとスライドに反映されます。`\graphicspath` に
+`../thesis/` も含めているため、`docs/thesis/` 側の元図を直接参照させることも
+できます。画像が見つからない場合は `\safeincludegraphics` がプレースホルダを
+表示し、コンパイルは停止しません。

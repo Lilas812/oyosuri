@@ -23,3 +23,18 @@ htmlcov/
 # IDE
 .vscode/
 .idea/
+
+# LaTeX build artifacts
+*.aux
+*.dvi
+*.fdb_latexmk
+*.fls
+*.nav
+*.out
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+docs/**/*.log
+# コンパイル生成物（.tex と figures/ のみ管理する方針）
+docs/slides/presentation.pdf
