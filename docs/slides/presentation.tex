@@ -24,10 +24,10 @@
 %      ・ノートページ付き     : 下の \setbeameroption{show notes} を有効化
 %      ・発表者ビュー(左右)   : show notes on second screen=right を有効化
 %
-%  --- おおよその時間配分（合計 約7分）--------------------------------
-%    表紙 12s / 背景・目的 50s / RW→CRW 45s / 極限分布 42s /
-%    予測モデル 48s / 離散化 38s / 実験(1) 52s / 実験(2) 40s /
-%    限界 55s / まとめ 45s / 謝辞 8s
+%  --- おおよその時間配分（合計 約7分・やや詰め気味）----------------
+%    表紙 10s / 背景・目的 45s / 通常RW(n=1〜3) 50s /
+%    相関RW(定義+n=1,2) 55s / 相関RW(n=3) 55s / 予測モデル 55s /
+%    離散化 32s / 実験 52s / 限界 45s / まとめ 35s / 謝辞 6s
 % =====================================================================
 \documentclass[dvipdfmx,aspectratio=169,10pt]{beamer}
 
@@ -159,85 +159,157 @@
 まず研究の背景です。金はインフレや地政学的リスクを反映する重要な資産で，その値動きのモデル化には実務・学術の両面で関心があります。本研究で用いる相関付きランダムウォークは，直前の値動きの向きに応じて次の向きを確率的に決めるモデルで，値動きの持続性や反転傾向を，少数のパラメータで表現できます。これは，Konno が2019年に提案した量子ウォークによる時系列モデルを，相関付きランダムウォークに応用したものです。ただし，これを金価格に当てはめた先行研究は，私の知る限りありません。そこで本研究では，金価格 XAUUSD を平均練行足で離散化してこのモデルを当てはめ，予測と実測を重ねた図と MAE によって，妥当性と限界を検討します。%
 }
 
-% =================  2. RW と 相関付きRW  ============================
-\begin{frame}[t]{ランダムウォークと相関付きランダムウォーク}
+% =================  2. 通常のランダムウォーク  =====================
+\begin{frame}[t]{通常のランダムウォーク：定義と確率分布}
   \small
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      {\color{myblue}\bfseries 通常のランダムウォーク}
-      \begin{itemize}
-        \item 各ステップは\alert{独立}に $\pm1$
-        \item 位置 $\displaystyle S_n=\sum_{k=1}^{n} T_k$
-        \item 直前の向きは次の一歩に\alert{無関係}
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries 定義}
+      \begin{itemize}\footnotesize
+        \item 各ステップ $T_k$ は\alert{独立}
+          \\ $P(T_k{=}{-}1){=}p,\ P(T_k{=}{+}1){=}q$（$p{+}q{=}1$）
+        \item 位置 $\displaystyle S_n=\sum_{k=1}^{n}T_k$（$S_0{=}0$）
+        \item 直前の向きは次に\alert{無関係}
+        \item 分布は\alert{二項係数}で決まる
+          \[ P(S_n{=}x)=\binom{n}{\ell}\,p^{\ell}q^{m},\quad
+             \ell{=}\tfrac{n-x}{2},\ m{=}\tfrac{n+x}{2} \]
       \end{itemize}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      {\color{myblue}\bfseries 相関付きランダムウォーク}
-      \begin{itemize}
-        \item 直前の向きが次の向きの確率に\alert{影響}
-        \item $P(\text{左}\mid\text{直前左})=a,\ P(\text{右}\mid\text{直前右})=d$
-        \item コイン行列 $A=\begin{pmatrix}a&b\\c&d\end{pmatrix}$\, ($a{+}c{=}b{+}d{=}1$)
-      \end{itemize}
-    \end{column}
-  \end{columns}
-  \vskip0.7em
-  \begin{block}{持続性と反転傾向（時間発展対称 $a=d$，$A=\left(\begin{smallmatrix}a&1-a\\1-a&a\end{smallmatrix}\right)$）}
-    \begin{itemize}
-      \item $a>\tfrac12$：同じ向きに進みやすい＝\alert{持続性}／$a<\tfrac12$：向きが反転しやすい＝\alert{反転傾向}
-      \item 左右の移動行列 $P,Q$ は\alert{非可換} $\Rightarrow$ 移動の順序が違えば確率も変わる（通常RWとの本質的な違い）
-    \end{itemize}
-  \end{block}
-\end{frame}
-\note{% 【約45秒】
-次にモデルの定義です。通常のランダムウォークは，各ステップが独立にプラス1かマイナス1動くもので，直前にどちらへ動いたかは，次の一歩に影響しません。一方，相関付きランダムウォークでは，直前の向きが次の向きの確率に影響します。左のあとに左へ進む確率を $a$，右のあとに右へ進む確率を $d$ とし，これらをまとめたものがコイン行列 $A$ です。特に $a=d$ のときを時間発展対称とよびます。$a$ が2分の1より大きいと，同じ向きに進みやすい持続性を，小さいと向きが反転しやすい反転傾向を表します。なお，左右の移動を表す行列は非可換で，同じ移動回数でも動く順序が違えば確率が変わる点が，通常のランダムウォークとの本質的な違いです。%
-}
-
-% =====================  3. 極限分布  ===============================
-\begin{frame}[t]{相関付きランダムウォークの性質：極限分布}
-  \small
-  \begin{columns}[T]
-    \begin{column}{0.44\textwidth}
-      \begin{itemize}
-        \item 弱収束極限定理：
-          \[ \frac{\tilde S_n}{\sqrt n}\ \Rightarrow\ N\!\left(0,\ \tfrac{a}{1-a}\right) \]
-        \item 分散 $\sigma^2=\dfrac{a}{1-a}$
-          \begin{itemize}\footnotesize
-            \item $a=\tfrac12$：$\sigma^2=1$（通常RWと一致）
-            \item $a>\tfrac12$（持続性）：$\sigma^2>1$，\alert{裾が広い}
-            \item $a<\tfrac12$（反転）：$\sigma^2<1$，\alert{裾が狭い}
-          \end{itemize}
-        \item \alert{たった1つの $a$} で値動きの粘り／反発を表現できる
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.56\textwidth}
-      \centering
-      \safeincludegraphics[width=\linewidth]{figures/crw_hist_n100}
-      \par{\footnotesize\color{mygray}$n=100$ の分布と標準正規分布の比較}
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries $n=1,2,3$ の確率分布}
+      \vskip0.4em
+      {\footnotesize
+      \renewcommand{\arraystretch}{1.45}
+      \begin{tabular}{@{}c@{\ \ }l@{}}
+        \hline
+        $n$ & 位置ごとの確率 \\ \hline
+        $1$ & $P({-}1){=}p,\ \ P({+}1){=}q$ \\
+        $2$ & $P({-}2){=}p^{2},\ P(0){=}2pq,\ P({+}2){=}q^{2}$ \\
+        $3$ & $P({-}3){=}p^{3},\ \ P({-}1){=}3p^{2}q,$ \\
+            & $P({+}1){=}3pq^{2},\ P({+}3){=}q^{3}$ \\ \hline
+      \end{tabular}}
+      \vskip0.6em
+      {\footnotesize\color{mygray}例：$P(S_2{=}0){=}2pq$ の係数 $2$ は，
+      「左右1回ずつ」が左右・右左の\alert{2通り}あることを表す（順序によらない）}
     \end{column}
   \end{columns}
 \end{frame}
-\note{% 【約42秒】
-このモデルの性質を，極限分布で見ます。時刻 $n$ の位置をルート $n$ で割ると，平均0，分散 $a$ 割る $1{-}a$ の正規分布に弱収束します。分散は $a$ が2分の1のとき1，つまり通常のランダムウォークと一致し，$a$ が大きいほど大きく，小さいほど小さくなります。図は $n=100$ での分布を標準正規分布と比べたものです。持続性を持つ $a=3$ 分の2の濃い分布は，中央が低く裾が広がり，反転傾向を持つ $a=3$ 分の1の薄い分布は，中央が高く裾が狭くなっています。このように，たった一つのパラメータ $a$ で，値動きの粘りや反発の強さを表せることが，このモデルの特徴です。%
+\note{% 【約50秒】
+まず通常のランダムウォークです。各ステップ $T$ は独立に，確率 $p$ でマイナス1，確率 $q$ でプラス1動き，位置はその和 $S_n$ です。直前の向きは次に影響しないため，時刻 $n$ で位置 $x$ にいる確率は二項係数で決まり，左右の移動の順序にはよりません。右の表が $n=1,2,3$ の分布です。たとえば $n=2$ で原点にいる確率は $2pq$。これは左右1回ずつの経路が，左右・右左の2通りあることを表す係数2をもちます。この「順序によらない」点が，次の相関付きとの違いになります。%
 }
 
-% =====================  4. 予測モデル  =============================
-\begin{frame}[t]{相関付きランダムウォークによる時系列予測モデル}
+% =================  3. 相関付きRW（定義・n=1,2）  ==================
+\begin{frame}[t]{相関付きランダムウォーク：定義と $n=1,2$}
   \small
-  \begin{block}{手順（Konno の量子ウォーク時系列モデルを相関付きRWへ応用）}
-  \begin{enumerate}
-    \item 観測値を，増分 $b_n=x_n-x_{n-1}\in\{-1,+1\}$，$x_0=0$ の系列で表す
-    \item モデルの位置確率 $\mu_t(x;p,q,\alpha)=P(\tilde S_t=x)$
-      \\{\footnotesize（$p$：右継続確率，$q$：左継続確率，$\alpha$：初期が左向きの確率）}
-    \item \alert{評価関数}（観測 $x_t$ とモデル位置 $x$ の二乗誤差を，確率で重み付け）
-      \[ V_n(p,q,\alpha)=\sum_{t=0}^{n}\sum_{x=-t}^{t}(x-x_t)^2\,\mu_t(x;p,q,\alpha) \]
-    \item $V_n$ を最小化するパラメータ $(p^\ast,q^\ast,\alpha^\ast)$ を格子上の全探索で推定
-    \item \alert{次時刻を期待値で予測}\quad
-      $x_{n+1}^{\ast}=E\!\left(\tilde S_{n+1}\mid p^\ast,q^\ast,\alpha^\ast\right)$
-  \end{enumerate}
-  \end{block}
+  \begin{columns}[T]
+    \begin{column}{0.53\textwidth}
+      {\color{myblue}\bfseries 定義}：直前の向きが次に\alert{影響}
+      \begin{itemize}\footnotesize
+        \item $P(\text{左}\mid\text{直前左}){=}a,\ P(\text{右}\mid\text{直前左}){=}c{=}1{-}a$
+        \item $P(\text{左}\mid\text{直前右}){=}b,\ P(\text{右}\mid\text{直前右}){=}d{=}1{-}b$
+      \end{itemize}
+      \vskip0.2em
+      コイン行列と左右移動への分解
+      \[ A=\begin{pmatrix}a&b\\c&d\end{pmatrix}
+         =\underbrace{\begin{pmatrix}a&b\\0&0\end{pmatrix}}_{P\ (\text{左})}
+          +\underbrace{\begin{pmatrix}0&0\\c&d\end{pmatrix}}_{Q\ (\text{右})} \]
+      {\footnotesize 初期 $\varphi{=}(\alpha,\beta)^{\!\top}$，時間発展
+        $\Psi_{n+1}(x){=}P\Psi_n(x{+}1){+}Q\Psi_n(x{-}1)$}
+      \begin{itemize}\footnotesize
+        \item $a>\tfrac12$：\alert{持続性}／$a<\tfrac12$：\alert{反転傾向}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      {\color{myblue}\bfseries $n=1,2$ の確率分布}
+      \vskip0.3em
+      {\footnotesize $n=1$：}
+      \[\footnotesize P(\tilde S_1{=}{-}1){=}a\alpha{+}b\beta,\quad
+        P(\tilde S_1{=}{+}1){=}c\alpha{+}d\beta\]
+      {\footnotesize $n=2$：}
+      \[\footnotesize\begin{aligned}
+        P(\tilde S_2{=}{-}2)&=a(a\alpha{+}b\beta)\\
+        P(\tilde S_2{=}0)&=b(c\alpha{+}d\beta){+}c(a\alpha{+}b\beta)\\
+        P(\tilde S_2{=}{+}2)&=d(c\alpha{+}d\beta)
+      \end{aligned}\]
+      {\footnotesize\color{mygray}和は $\alpha{+}\beta{=}1$（確率測度になる）}
+    \end{column}
+  \end{columns}
 \end{frame}
-\note{% 【約48秒】
-では，このモデルをどう予測に使うかです。まず，観測した値動きを，増分がプラス1かマイナス1の系列として表します。モデルは，パラメータ $p$，$q$，$\alpha$ で，時刻 $t$ に位置 $x$ にいる確率 $\mu$ を与えます。$p$ は右への継続確率，$q$ は左への継続確率，$\alpha$ は初期の向きが左である確率です。次に，観測値 $x$ と，モデルが取りうる位置 $x$ との二乗誤差を，その位置の確率で重み付けして足し合わせた，評価関数 $V$ を作ります。これを最小にするパラメータを，格子上の全探索で推定し，そのパラメータのもとでの次時刻の期待値を，予測値とします。これが，Konno の量子ウォーク時系列モデルを，相関付きランダムウォークに応用した予測の枠組みです。%
+\note{% 【約55秒】
+次に相関付きランダムウォークです。直前が左なら次に左へ行く確率を $a$，直前が右なら右へ行く確率を $d$ などと定め，これらをコイン行列 $A$ にまとめます。$A$ は左へ動く成分 $P$ と右へ動く成分 $Q$ に分解でき，確率ベクトルはこの $P$ と $Q$ で1歩ずつ時間発展します。$a$ が2分の1より大きければ持続性，小さければ反転傾向です。右が実際の計算で，$n=1$ では左へ行く確率が $a\alpha{+}b\beta$，右が $c\alpha{+}d\beta$。$n=2$ も $P$ と $Q$ を掛けて求め，全体の和はきちんと1になります。%
+}
+
+% =================  4. 相関付きRW（n=3・非可換性）  ===============
+\begin{frame}[t]{相関付きランダムウォーク：$n=3$ の確率分布と非可換性}
+  \small
+  経路和 $\Xi_n(l,m)$：$P$ を $l$ 個，$Q$ を $m$ 個含む\alert{全順序の行列積の和}．
+  位置の確率は $P(\tilde S_n{=}x)=\lVert\Xi_n(l,m)\,\varphi\rVert_1$．
+  \vskip0.3em
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      {\footnotesize
+      \[\begin{aligned}
+        \Xi_3(3,0)&=P^3,\qquad \Xi_3(0,3)=Q^3\\
+        \Xi_3(2,1)&=\alert{QP^2+PQP+P^2Q}\\
+        \Xi_3(1,2)&=\alert{PQ^2+QPQ+Q^2P}
+      \end{aligned}\]}
+      \begin{itemize}\footnotesize
+        \item $P,Q$ は行列で\alert{非可換}
+          \\ $QP^2{+}PQP{+}P^2Q\ \neq\ 3P^2Q$
+        \item 左右の回数が同じでも\alert{順序で確率が変わる}
+        \item $\Rightarrow$ 二項分布では表せない（相関の効果）
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      {\color{myblue}\bfseries $n=3$ の完全な確率}（$c{=}1{-}a,\ d{=}1{-}b$）
+      {\footnotesize
+      \[\begin{aligned}
+        P(\tilde S_3{=}{-}3)&=a^{2}(a\alpha{+}b\beta)\\
+        P(\tilde S_3{=}{-}1)&=ac(a{+}2b)\,\alpha+b(ac{+}ad{+}bc)\,\beta\\
+        P(\tilde S_3{=}{+}1)&=c(ad{+}bc{+}bd)\,\alpha+bd(2c{+}d)\,\beta\\
+        P(\tilde S_3{=}{+}3)&=d^{2}(c\alpha{+}d\beta)
+      \end{aligned}\]}
+      {\footnotesize\color{mygray}$a{\leftrightarrow}d,\ b{\leftrightarrow}c,\ \alpha{\leftrightarrow}\beta$ の入れ替えで
+      $x{\leftrightarrow}{-}x$ が対応する対称性をもつ}
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{% 【約55秒】
+$n=3$ を見ます。鍵は経路和 $\Xi$ です。これは $P$ を $l$ 個，$Q$ を $m$ 個含む，あらゆる順序の行列積を足したもので，位置の確率はこれに初期ベクトルを掛けたノルムで与えられます。たとえば左2回・右1回の $\Xi(2,1)$ は，$QP^2$，$PQP$，$P^2Q$ の3通りの和です。ここで $P$ と $Q$ は行列で非可換なので，この和は $3P^2Q$ とは等しくありません。つまり，左右の回数が同じでも動く順序が違えば確率が変わる。これが，二項分布では表せない相関の効果です。右が $n=3$ の完全な確率で，$a$ と $d$，$b$ と $c$，$\alpha$ と $\beta$ を入れ替えると左右が入れ替わる対称性をもっています。%
+}
+
+% =================  5. 予測モデル（評価関数・当てはめ）  ==========
+\begin{frame}[t]{相関付きRWによる時系列予測：評価関数と当てはめ}
+  \small
+  観測時系列 $x_0,\dots,x_n$（増分 $\pm1$，$x_0{=}0$）に対し，パラメータ
+  $(p,q,\alpha)$ を推定して次時刻を予測する。
+  \par{\footnotesize\color{mygray}$p$：右継続確率，$q$：左継続確率，$\alpha$：初期が左向きの確率（第3〜4章の $a,b,c,d$ とは $a{=}q,\ b{=}1{-}p,\ c{=}1{-}q,\ d{=}p$）}
+  \vskip0.4em
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries ① モデル分布とのズレを測る}
+      \begin{itemize}\footnotesize
+        \item $\mu_t(x;p,q,\alpha){=}P(\tilde S_t{=}x)$
+          \\ ＝\alert{先ほど $n{=}1,2,3$ で求めた分布}そのもの
+        \item 評価関数（二乗誤差を確率で重み付け）
+          \[\footnotesize V_n(p,q,\alpha){=}\sum_{t=0}^{n}\sum_{x}(x{-}x_t)^{2}\,\mu_t(x;p,q,\alpha)\]
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries ② 当てはめて予測する}
+      \begin{itemize}\footnotesize
+        \item 格子 $\{0,0.1,\dots,1\}^{3}$（$1331$ 点）で $V_n$ を\alert{全探索}し最小化 $\to(p^\ast,q^\ast,\alpha^\ast)$
+        \item 次時刻を\alert{期待値}で予測
+          \[\footnotesize x_{n+1}^{\ast}{=}E(\tilde S_{n+1}\mid p^\ast,q^\ast,\alpha^\ast){=}\sum_x x\,\mu_{n+1}(x;\!\cdot)\]
+        \item 最小解が複数なら平均，$V_n$ 一定なら $x_{n+1}^{\ast}{=}x_n$
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vskip0.2em
+  \centering{\footnotesize\color{mygray}以上を各 $n$ で繰り返し，予測列 $x_1^{\ast},\dots,x_N^{\ast}$ を得る（Konno の量子ウォーク時系列モデルの応用）}
+\end{frame}
+\note{% 【約55秒】
+では，この分布をどう時系列予測に使うかです。観測した増分プラスマイナス1の系列に対し，パラメータ $p$，$q$，$\alpha$ を推定します。左の $\mu$ が，いま $n=1,2,3$ で求めたモデルの分布そのものです。各時刻で，観測値 $x_t$ と，モデルが取りうる位置 $x$ の二乗誤差を，確率 $\mu$ で重み付けして足したものが評価関数 $V$ です。右のように，$V$ を格子上の1331点で全探索して最小にするパラメータを求め，そのもとでの次時刻の期待値を予測値とします。最小解が複数なら平均，$V$ が一定なら変化なしとします。これを各時刻で繰り返して，予測列を得ます。%
 }
 
 % =====================  5. 離散化  ================================
@@ -277,53 +349,32 @@
 実際の金価格は連続的に変動するので，そのままではモデルに入れられません。そこで，平均練行足という手法で，値幅 $B$ ごとの上昇・下降に変換します。基準価格から $B$ 以上上がればプラス1の足，$B$ 以上下がればマイナス1の足を立て，継続でも反転でも $B$ 動けば1本生成します。大きく動いた場合は，同じ向きに複数本立てます。こうして得た符号を積み上げると，図のような，ボックス単位の整数の時系列 $x$ になります。この離散化された系列を，先ほどのモデルの入力として使います。%
 }
 
-% =================  6. 実験(1)：全期間参照  ========================
-\begin{frame}[t]{実験①：全期間参照とその失敗}
-  \small
-  \begin{block}{実験設定}
-    \begin{itemize}\footnotesize
-      \item データ：XAUUSD 1分足（2026-06-29〜30，UTC，317本），値幅 $B=3$ ドル，練行足 $N=156$ 本
-      \item 評価：\alert{予測と実測の重ね描き}を中心に，補助指標として MAE と方向的中率 HIT
-      \item 目安：練行足は毎回 $\pm1$ 動くため，「変化なし」予測は $\mathrm{MAE}=1$，でたらめな方向予測は $\mathrm{HIT}=0.5$
-    \end{itemize}
-  \end{block}
-  \begin{block}{全期間 $D_n$ を参照した場合（第5章のモデルそのまま）}
-    \begin{itemize}
-      \item \alert{$\mathrm{MAE}=5.94$}（基準の約6倍），\alert{$\mathrm{HIT}=0.43$}（$0.5$ 未満）→ 両指標で基準以下
-      \item 原因：全期間参照は値動きを\alert{定常}と仮定。実際は\alert{非定常}（上昇・下降・レンジが移り変わる）ため，終わった局面の観測が推定に混入し，予測が系統的にずれる
-    \end{itemize}
-  \end{block}
-\end{frame}
-\note{% 【約52秒】
-ここから実験結果です。対象は XAUUSD の1分足で，2026年6月末の約5時間，値幅 $B$ は3ドル，練行足は156本です。評価は，予測と実測を重ねた図を中心に，補助としてMAEと方向的中率HITを使います。練行足は毎回必ずプラスマイナス1動くので，変化なし予測のMAEは1，方向をでたらめに当てるHITは0.5が目安になります。まず，第5章のモデルをそのまま，過去の全期間を参照して当てはめると，MAEは5.94と基準の約6倍，HITは0.43と0.5を下回り，両方の指標で基準を下回りました。原因は，全期間参照が値動きを定常と仮定している点にあります。実際の価格は，上昇・下降・レンジが移り変わる非定常な系列なので，終わった局面の観測が推定に混ざり続け，予測が系統的にずれてしまうのです。%
-}
-
-% =================  7. 実験(2)：参照期間W  =========================
-\begin{frame}[t]{実験②：参照期間 $W$ の導入と効果}
+% =================  6. 実験：全期間の失敗と参照期間W  =============
+\begin{frame}[t]{実験：金価格 XAUUSD への適用}
   \small
   \begin{columns}[T]
-    \begin{column}{0.44\textwidth}
-      \begin{itemize}
+    \begin{column}{0.46\textwidth}
+      {\footnotesize {\color{myblue}\bfseries 設定}：XAUUSD 1分足（2026-06，$B{=}3$ ドル，練行足 $N{=}156$）。予測と実測の\alert{重ね描き}＋MAE・HIT で評価（「変化なし」＝MAE$\,1$，でたらめ＝HIT$\,0.5$ が目安）。}
+      \vskip0.4em
+      \begin{itemize}\footnotesize
+        \item \textbf{全期間参照}（第5章のまま）は\alert{破綻}
+          \\ $\mathrm{MAE}{=}5.94$（基準の約6倍），$\mathrm{HIT}{=}0.43$
+          \\ 原因：\alert{非定常}な値動きを定常と仮定
         \item 改良：当てはめを\alert{直近 $W$ 点}に限定（参照期間 $W$）
-        \item $W\in\{2,3,5,10,20,30,60,\text{全期間}\}$ を比較
-        \item MAE は\alert{$W$ が小さいほど小さい}
-          \begin{itemize}\footnotesize
-            \item 最小は $W=2$ で $\mathrm{MAE}=0.847$
-            \item 基準 $1$ を下回るのは $W=2,\,3$ のみ
-          \end{itemize}
-        \item 計算時間も $W$ とともに増加
-        \item \alert{精度と計算量にトレードオフなし}（小さい $W$ が両面で有利）
+        \item $W$ が小さいほど MAE 小
+          （\alert{$W{=}2$ で $0.847$}，基準 $1$ 未満は $W{=}2,3$ のみ）
+        \item 計算時間も $W$ とともに減 $\Rightarrow$ \alert{トレードオフなし}
       \end{itemize}
     \end{column}
-    \begin{column}{0.56\textwidth}
+    \begin{column}{0.54\textwidth}
       \centering
       \safeincludegraphics[width=\linewidth]{figures/w_sweep_summary}
       \par{\footnotesize\color{mygray}参照期間 $W$ に対する MAE（左）と1ステップ計算時間（右）}
     \end{column}
   \end{columns}
 \end{frame}
-\note{% 【約40秒】
-そこで，当てはめに使う観測を，直近の $W$ 点だけに絞る，参照期間 $W$ を導入します。$W$ を2から全期間まで変えて比較したのが，この図です。左のMAEを見ると，$W$ が小さいほど誤差が小さく，$W=2$ で最小の0.847になります。基準の1を下回るのは，$W=2$ と $W=3$ だけでした。右の計算時間も，$W$ とともに増えます。つまり，精度と計算量の間にトレードオフはなく，参照期間を小さく絞るほど，誤差も計算量も小さくなるという，一見望ましい結果が得られました。%
+\note{% 【約52秒】
+実験です。対象は金価格 XAUUSD の1分足，値幅3ドルで作った練行足156本。予測と実測の重ね描きを中心に，MAEと方向的中率で評価します。練行足は毎回プラスマイナス1動くので，変化なし予測のMAEは1，でたらめな方向予測のHITは0.5が目安です。まず第5章のモデルをそのまま全期間参照で当てはめると，MAEは5.94，HITは0.43で破綻しました。値動きは上昇・下降・レンジが移り変わる非定常な系列なのに，全期間参照はこれを定常と仮定してしまうためです。そこで当てはめを直近 $W$ 点に限定すると，右図のように $W$ が小さいほどMAEも計算時間も小さくなり，$W=2$ で最小の0.847。精度と計算量にトレードオフはありませんでした。%
 }
 
 % =====================  8. モデルの限界  ==========================
