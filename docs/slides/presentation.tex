@@ -24,10 +24,12 @@
 %      ・ノートページ付き     : 下の \setbeameroption{show notes} を有効化
 %      ・発表者ビュー(左右)   : show notes on second screen=right を有効化
 %
-%  --- おおよその時間配分（合計 約7分・やや詰め気味）----------------
-%    表紙 10s / 背景・目的 45s / 通常RW(n=1〜3) 50s /
-%    相関RW(定義+n=1,2) 55s / 相関RW(n=3) 55s / 予測モデル 55s /
-%    離散化 32s / 実験 52s / 限界 45s / まとめ 35s / 謝辞 6s
+%  --- おおよその時間配分（合計 約7分半〜8分：行列計算を丁寧に見せる構成）
+%    表紙 10s / 背景 40s / 通常RW 45s / 相関RW(定義・行列) 45s /
+%    相関RW(行列計算 n=1,2) 55s / 相関RW(n=3・非可換) 50s / 予測モデル 50s /
+%    離散化 30s / 実験 48s / 限界 42s / まとめ 33s / 謝辞 6s
+%    ※ 厳密に7分に収めたい場合は、スライド6(n=3)を経路和と非可換性だけに
+%      絞る／スライド5と6を口頭補足に回す等で短縮できます。
 % =====================================================================
 \documentclass[dvipdfmx,aspectratio=169,10pt]{beamer}
 
@@ -201,69 +203,89 @@
 まず通常のランダムウォークです。各ステップ $T$ は独立に，確率 $p$ でマイナス1，確率 $q$ でプラス1動き，位置はその和 $S_n$ です。直前の向きは次に影響しないため，時刻 $n$ で位置 $x$ にいる確率は二項係数で決まり，左右の移動の順序にはよりません。右の表が $n=1,2,3$ の分布です。たとえば $n=2$ で原点にいる確率は $2pq$。これは左右1回ずつの経路が，左右・右左の2通りあることを表す係数2をもちます。この「順序によらない」点が，次の相関付きとの違いになります。%
 }
 
-% =================  3. 相関付きRW（定義・n=1,2）  ==================
-\begin{frame}[t]{相関付きランダムウォーク：定義と $n=1,2$}
+% =================  3. 相関付きRW（定義・行列定式化）  ============
+\begin{frame}[t]{相関付きランダムウォーク：定義と行列による定式化}
   \small
   \begin{columns}[T]
-    \begin{column}{0.53\textwidth}
+    \begin{column}{0.5\textwidth}
       {\color{myblue}\bfseries 定義}：直前の向きが次に\alert{影響}
       \begin{itemize}\footnotesize
         \item $P(\text{左}\mid\text{直前左}){=}a,\ P(\text{右}\mid\text{直前左}){=}c{=}1{-}a$
         \item $P(\text{左}\mid\text{直前右}){=}b,\ P(\text{右}\mid\text{直前右}){=}d{=}1{-}b$
       \end{itemize}
-      \vskip0.2em
-      コイン行列と左右移動への分解
+      \vskip0.3em
+      コイン行列と\alert{左右移動への分解}
       \[ A=\begin{pmatrix}a&b\\c&d\end{pmatrix}
-         =\underbrace{\begin{pmatrix}a&b\\0&0\end{pmatrix}}_{P\ (\text{左})}
-          +\underbrace{\begin{pmatrix}0&0\\c&d\end{pmatrix}}_{Q\ (\text{右})} \]
-      {\footnotesize 初期 $\varphi{=}(\alpha,\beta)^{\!\top}$，時間発展
-        $\Psi_{n+1}(x){=}P\Psi_n(x{+}1){+}Q\Psi_n(x{-}1)$}
+         =\underbrace{\begin{pmatrix}a&b\\0&0\end{pmatrix}}_{P\ (\text{左移動})}
+          +\underbrace{\begin{pmatrix}0&0\\c&d\end{pmatrix}}_{Q\ (\text{右移動})} \]
       \begin{itemize}\footnotesize
         \item $a>\tfrac12$：\alert{持続性}／$a<\tfrac12$：\alert{反転傾向}
       \end{itemize}
     \end{column}
-    \begin{column}{0.47\textwidth}
-      {\color{myblue}\bfseries $n=1,2$ の確率分布}
-      \vskip0.3em
-      {\footnotesize $n=1$：}
-      \[\footnotesize P(\tilde S_1{=}{-}1){=}a\alpha{+}b\beta,\quad
-        P(\tilde S_1{=}{+}1){=}c\alpha{+}d\beta\]
-      {\footnotesize $n=2$：}
-      \[\footnotesize\begin{aligned}
-        P(\tilde S_2{=}{-}2)&=a(a\alpha{+}b\beta)\\
-        P(\tilde S_2{=}0)&=b(c\alpha{+}d\beta){+}c(a\alpha{+}b\beta)\\
-        P(\tilde S_2{=}{+}2)&=d(c\alpha{+}d\beta)
-      \end{aligned}\]
-      {\footnotesize\color{mygray}和は $\alpha{+}\beta{=}1$（確率測度になる）}
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries 確率ベクトルの時間発展}
+      \begin{itemize}\footnotesize
+        \item 時刻 $n$・位置 $x$ の確率ベクトルと初期値
+          \[ \Psi_n(x)=\begin{pmatrix}\Psi_n^{L}(x)\\[1pt]\Psi_n^{R}(x)\end{pmatrix},\ \
+             \Psi_0(0)=\varphi=\begin{pmatrix}\alpha\\\beta\end{pmatrix} \]
+        \item 発展則（$P$ が左へ，$Q$ が右へ運ぶ）
+          \[ \Psi_{n+1}(x)=P\,\Psi_n(x{+}1)+Q\,\Psi_n(x{-}1) \]
+        \item 位置の確率は成分の和
+          \[ P(\tilde S_n{=}x)=\lVert\Psi_n(x)\rVert_1=\Psi_n^{L}(x)+\Psi_n^{R}(x) \]
+      \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
-\note{% 【約55秒】
-次に相関付きランダムウォークです。直前が左なら次に左へ行く確率を $a$，直前が右なら右へ行く確率を $d$ などと定め，これらをコイン行列 $A$ にまとめます。$A$ は左へ動く成分 $P$ と右へ動く成分 $Q$ に分解でき，確率ベクトルはこの $P$ と $Q$ で1歩ずつ時間発展します。$a$ が2分の1より大きければ持続性，小さければ反転傾向です。右が実際の計算で，$n=1$ では左へ行く確率が $a\alpha{+}b\beta$，右が $c\alpha{+}d\beta$。$n=2$ も $P$ と $Q$ を掛けて求め，全体の和はきちんと1になります。%
+\note{% 【約45秒】
+相関付きランダムウォークです。直前が左なら次に左へ行く確率を $a$，右なら右へ行く確率を $d$ などと定め，コイン行列 $A$ にまとめます。ここが本質で，$A$ を左へ動かす成分 $P$ と右へ動かす成分 $Q$ に分解します。すると，時刻 $n$・位置 $x$ の状態を確率ベクトル $\Psi$ で表し，$P$ と $Q$ を掛けながら1歩ずつ時間発展させることで分布が計算できます。位置の確率は，そのベクトルの成分の和です。$a$ が2分の1より大きければ持続性，小さければ反転傾向を表します。%
 }
 
-% =================  4. 相関付きRW（n=3・非可換性）  ===============
-\begin{frame}[t]{相関付きランダムウォーク：$n=3$ の確率分布と非可換性}
+% =================  4. 相関付きRW（行列計算 n=1,2）  ==============
+\begin{frame}[t]{相関付きランダムウォーク：行列計算（$n=1,2$）}
   \small
-  経路和 $\Xi_n(l,m)$：$P$ を $l$ 個，$Q$ を $m$ 個含む\alert{全順序の行列積の和}．
-  位置の確率は $P(\tilde S_n{=}x)=\lVert\Xi_n(l,m)\,\varphi\rVert_1$．
-  \vskip0.3em
+  {\color{myblue}\bfseries $n=1$（原点から1歩目）}：初期ベクトル $\varphi$ に $P,Q$ を掛ける
+  {\footnotesize
+  \[\begin{aligned}
+    \Psi_1(-1)&=P\varphi=\begin{pmatrix}a&b\\0&0\end{pmatrix}\begin{pmatrix}\alpha\\\beta\end{pmatrix}
+      =\begin{pmatrix}a\alpha+b\beta\\0\end{pmatrix},\qquad
+    \Psi_1(+1)=Q\varphi=\begin{pmatrix}0&0\\c&d\end{pmatrix}\begin{pmatrix}\alpha\\\beta\end{pmatrix}
+      =\begin{pmatrix}0\\c\alpha+d\beta\end{pmatrix}
+  \end{aligned}\]}
+  {\color{myblue}\bfseries $n=2$（発展則 $\Psi_{n+1}(x){=}P\Psi_n(x{+}1){+}Q\Psi_n(x{-}1)$ を適用）}
+  {\footnotesize
+  \[\begin{aligned}
+    \Psi_2(-2)&=P\Psi_1(-1)=\begin{pmatrix}a(a\alpha+b\beta)\\0\end{pmatrix},\qquad
+    \Psi_2(+2)=Q\Psi_1(+1)=\begin{pmatrix}0\\d(c\alpha+d\beta)\end{pmatrix}\\[2pt]
+    \Psi_2(0)&=P\Psi_1(+1)+Q\Psi_1(-1)
+      =\begin{pmatrix}b(c\alpha+d\beta)\\0\end{pmatrix}+\begin{pmatrix}0\\c(a\alpha+b\beta)\end{pmatrix}
+      =\begin{pmatrix}b(c\alpha+d\beta)\\c(a\alpha+b\beta)\end{pmatrix}
+  \end{aligned}\]}
+  \centering{\footnotesize\color{mygray}位置の確率は成分の和：$P(\tilde S_2{=}0)=\lVert\Psi_2(0)\rVert_1=b(c\alpha+d\beta)+c(a\alpha+b\beta)$}
+\end{frame}
+\note{% 【約55秒】
+では実際に行列で計算します。1歩目は，初期ベクトル $\varphi$ に $P$ と $Q$ を掛けるだけです。$P$ を掛けると左向き成分に $a\alpha{+}b\beta$，$Q$ を掛けると右向き成分に $c\alpha{+}d\beta$ が現れ，これがそれぞれ位置マイナス1，プラス1にいる確率です。2歩目は，発展則にしたがって1歩目のベクトルにまた $P$ と $Q$ を掛けて足します。たとえば原点に戻る $\Psi_2(0)$ は，右にいた状態に $P$ を掛けたものと，左にいた状態に $Q$ を掛けたものの和で，$b(c\alpha{+}d\beta){+}c(a\alpha{+}b\beta)$ になります。このように，行列を掛けて足すだけで分布が求まります。%
+}
+
+% =================  5. 相関付きRW（n=3・非可換性）  ===============
+\begin{frame}[t]{相関付きランダムウォーク：$n=3$ と非可換性}
+  \small
   \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
+    \begin{column}{0.5\textwidth}
+      {\color{myblue}\bfseries 非可換性を行列で確認}
       {\footnotesize
-      \[\begin{aligned}
-        \Xi_3(3,0)&=P^3,\qquad \Xi_3(0,3)=Q^3\\
-        \Xi_3(2,1)&=\alert{QP^2+PQP+P^2Q}\\
-        \Xi_3(1,2)&=\alert{PQ^2+QPQ+Q^2P}
-      \end{aligned}\]}
+      \[ PQ=\begin{pmatrix}bc&bd\\0&0\end{pmatrix},\quad
+         QP=\begin{pmatrix}0&0\\ca&cb\end{pmatrix}
+         \ \Rightarrow\ \alert{PQ\neq QP} \]}
+      経路和（全順序の積の和）で $n=3$ は
+      {\footnotesize
+      \[ \Xi_3(2,1)=\alert{QP^2+PQP+P^2Q}\ (\neq 3P^2Q) \]}
       \begin{itemize}\footnotesize
-        \item $P,Q$ は行列で\alert{非可換}
-          \\ $QP^2{+}PQP{+}P^2Q\ \neq\ 3P^2Q$
         \item 左右の回数が同じでも\alert{順序で確率が変わる}
         \item $\Rightarrow$ 二項分布では表せない（相関の効果）
+        \item 確率は $P(\tilde S_3{=}x)=\lVert\Xi_3(l,m)\,\varphi\rVert_1$
       \end{itemize}
     \end{column}
-    \begin{column}{0.55\textwidth}
+    \begin{column}{0.5\textwidth}
       {\color{myblue}\bfseries $n=3$ の完全な確率}（$c{=}1{-}a,\ d{=}1{-}b$）
       {\footnotesize
       \[\begin{aligned}
@@ -272,13 +294,12 @@
         P(\tilde S_3{=}{+}1)&=c(ad{+}bc{+}bd)\,\alpha+bd(2c{+}d)\,\beta\\
         P(\tilde S_3{=}{+}3)&=d^{2}(c\alpha{+}d\beta)
       \end{aligned}\]}
-      {\footnotesize\color{mygray}$a{\leftrightarrow}d,\ b{\leftrightarrow}c,\ \alpha{\leftrightarrow}\beta$ の入れ替えで
-      $x{\leftrightarrow}{-}x$ が対応する対称性をもつ}
+      {\footnotesize\color{mygray}$a{\leftrightarrow}d,\ b{\leftrightarrow}c,\ \alpha{\leftrightarrow}\beta$ の入れ替えで $x{\leftrightarrow}{-}x$ が対応}
     \end{column}
   \end{columns}
 \end{frame}
 \note{% 【約55秒】
-$n=3$ を見ます。鍵は経路和 $\Xi$ です。これは $P$ を $l$ 個，$Q$ を $m$ 個含む，あらゆる順序の行列積を足したもので，位置の確率はこれに初期ベクトルを掛けたノルムで与えられます。たとえば左2回・右1回の $\Xi(2,1)$ は，$QP^2$，$PQP$，$P^2Q$ の3通りの和です。ここで $P$ と $Q$ は行列で非可換なので，この和は $3P^2Q$ とは等しくありません。つまり，左右の回数が同じでも動く順序が違えば確率が変わる。これが，二項分布では表せない相関の効果です。右が $n=3$ の完全な確率で，$a$ と $d$，$b$ と $c$，$\alpha$ と $\beta$ を入れ替えると左右が入れ替わる対称性をもっています。%
+3歩目に進む前に，通常のランダムウォークとの決定的な違いを見ます。$P$ と $Q$ は行列なので，掛ける順序で結果が変わります。実際 $PQ$ と $QP$ を計算すると，このように別の行列になります。したがって $n=3$ では，左右の回数が同じでも順序ごとに寄与が異なり，経路和 $\Xi$ は $QP^2{+}PQP{+}P^2Q$ のように全順序の和になります。これは $3P^2Q$ とは等しくありません。この非可換性のため，確率は単純な二項分布では表せません。右が $n=3$ の完全な確率で，$a$ と $d$，$b$ と $c$，$\alpha$ と $\beta$ を入れ替えると左右が対応する対称性をもちます。%
 }
 
 % =================  5. 予測モデル（評価関数・当てはめ）  ==========
@@ -286,7 +307,7 @@ $n=3$ を見ます。鍵は経路和 $\Xi$ です。これは $P$ を $l$ 個，
   \small
   観測時系列 $x_0,\dots,x_n$（増分 $\pm1$，$x_0{=}0$）に対し，パラメータ
   $(p,q,\alpha)$ を推定して次時刻を予測する。
-  \par{\footnotesize\color{mygray}$p$：右継続確率，$q$：左継続確率，$\alpha$：初期が左向きの確率（第3〜4章の $a,b,c,d$ とは $a{=}q,\ b{=}1{-}p,\ c{=}1{-}q,\ d{=}p$）}
+  \par{\footnotesize\color{mygray}$p$：右継続確率，$q$：左継続確率，$\alpha$：初期が左向きの確率（先ほどの $a,b,c,d$ とは $a{=}q,\ b{=}1{-}p,\ c{=}1{-}q,\ d{=}p$）}
   \vskip0.4em
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
