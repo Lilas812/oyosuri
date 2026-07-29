@@ -47,51 +47,55 @@
 %\setbeameroption{show notes}
 %\setbeameroption{show notes on second screen=right}
 
-% ======================  配色・デザイン  =============================
-\definecolor{myblue}{RGB}{23,54,93}     % 濃紺（基調色）
-\definecolor{mygold}{RGB}{193,146,42}   % 金（アクセント：金価格にちなむ）
-\definecolor{myaccent}{RGB}{150,95,0}   % 強調テキスト用の濃い琥珀
-\definecolor{mygray}{RGB}{90,90,90}
+% ==============  配色・デザイン（落ち着いたモノトーン）  =============
+% ほぼ黒＋くすんだ濃紺の一色のみ。装飾は細いグレー罫線に限定する。
+\definecolor{ink}{RGB}{40,44,50}       % 主要テキスト（やわらかい黒）
+\definecolor{accent}{RGB}{47,72,101}   % 構造・強調用のくすんだ濃紺（唯一の色）
+\definecolor{sub}{RGB}{125,125,128}    % 補助テキスト・ページ番号（グレー）
+\definecolor{hair}{RGB}{206,208,212}   % 罫線（細いグレー）
+% 旧配色名の後方互換（本文中の \color{...} をそのまま活かす）
+\colorlet{myblue}{accent}
+\colorlet{myaccent}{accent}
+\colorlet{mygray}{sub}
+\colorlet{mygold}{hair}
 
-\setbeamercolor{structure}{fg=myblue}
-\setbeamercolor{title}{fg=myblue}
-\setbeamercolor{frametitle}{fg=myblue}
-\setbeamercolor{normal text}{fg=black}
-\setbeamercolor{alerted text}{fg=myaccent}
-\setbeamercolor{block title}{fg=white,bg=myblue}
-\setbeamercolor{block body}{bg=myblue!8}
-\setbeamercolor{itemize item}{fg=mygold}
-\setbeamercolor{itemize subitem}{fg=mygold}
-\setbeamercolor{enumerate item}{fg=myblue}
-\setbeamercolor{author in head/foot}{fg=white,bg=myblue}
-\setbeamercolor{title in head/foot}{fg=white,bg=myblue}
+\setbeamercolor{normal text}{fg=ink}
+\setbeamercolor{structure}{fg=accent}
+\setbeamercolor{title}{fg=ink}
+\setbeamercolor{frametitle}{fg=accent}
+\setbeamercolor{alerted text}{fg=accent}
+\setbeamercolor{block title}{fg=accent}
+\setbeamercolor{block body}{fg=ink}
+\setbeamercolor{itemize item}{fg=sub}
+\setbeamercolor{itemize subitem}{fg=sub}
+\setbeamercolor{enumerate item}{fg=accent}
 
-\setbeamerfont{frametitle}{size=\large,series=\bfseries}
-\setbeamerfont{author in head/foot}{size=\scriptsize}
-\setbeamerfont{title in head/foot}{size=\scriptsize}
+\setbeamerfont{frametitle}{size=\large}
 \setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{itemize items}[circle]
 
-% フレームタイトル：濃紺の見出し＋金の下線
+% 箇条書き：控えめなダッシュ（グレー）
+\setbeamertemplate{itemize item}{\color{sub}\small\raisebox{0.2ex}{--}}
+\setbeamertemplate{itemize subitem}{\color{sub}\footnotesize\textperiodcentered}
+
+% フレームタイトル：見出し＋細いグレー罫線のみ（色帯なし）
 \setbeamertemplate{frametitle}{%
-  \vskip0.55em%
+  \vskip0.9em%
   {\usebeamercolor[fg]{frametitle}\usebeamerfont{frametitle}\insertframetitle\par}%
-  \vskip0.12em%
-  {\color{mygold}\rule{\textwidth}{1pt}}\par%
-  \vskip0.15em%
+  \vskip0.30em{\color{hair}\hrule height0.4pt}%
 }
 
-% フッタ：題目（左）／氏名・ページ番号（右）
+% ブロック：塗りつぶし・囲みなし。太字の小見出しのみ
+\setbeamertemplate{block begin}{%
+  \par\vskip4pt%
+  {\usebeamercolor[fg]{block title}\bfseries\insertblocktitle\par}%
+  \vskip2pt%
+}
+\setbeamertemplate{block end}{\vskip5pt}
+
+% フッタ：ページ番号のみ（右下・小・グレー）
 \setbeamertemplate{footline}{%
-  \leavevmode%
-  \hbox{%
-    \begin{beamercolorbox}[wd=.62\paperwidth,ht=2.4ex,dp=1ex,leftskip=.35cm]{author in head/foot}%
-      \usebeamerfont{author in head/foot}相関付きランダムウォークモデルを用いた時系列解析%
-    \end{beamercolorbox}%
-    \begin{beamercolorbox}[wd=.38\paperwidth,ht=2.4ex,dp=1ex,rightskip=.35cm]{title in head/foot}%
-      \usebeamerfont{title in head/foot}\hfill 北村 慎悟\quad\insertframenumber\,/\,\inserttotalframenumber%
-    \end{beamercolorbox}%
-  }\vskip0pt%
+  \hbox{}\hfill{\color{sub}\scriptsize\insertframenumber\,/\,\inserttotalframenumber}\hspace*{1.2em}%
+  \vskip5pt%
 }
 
 % 画像が無くてもコンパイルを止めない安全な \includegraphics
@@ -117,20 +121,19 @@
 \begin{frame}[plain]
   \centering
   \vfill
-  {\color{mygold}\rule{0.9\textwidth}{2.5pt}}\par\vskip1.1em
-  {\usebeamercolor[fg]{title}\LARGE\bfseries 相関付きランダムウォークモデルを用いた\\[4pt]時系列解析\par}
-  \vskip0.7em
-  {\color{mygray}\large ―― 金価格の時系列予測への応用とモデルの限界 ――\par}
-  \vskip0.6em
-  {\color{mygold}\rule{0.9\textwidth}{2.5pt}}\par
-  \vskip1.7em
-  {\large 発表者\quad 2520148K\quad 北村 慎悟\par}
-  \vskip0.5em
-  {\normalsize 指導教員\quad 安藤 和典 教授\quad ・\quad 森岡 悠 准教授\par}
+  {\color{sub}\footnotesize 卒業論文発表}\par
+  \vskip1.5em
+  {\usebeamercolor[fg]{title}\LARGE 相関付きランダムウォークモデルを用いた\\[5pt]時系列解析\par}
   \vskip0.9em
-  {\small 愛媛大学 工学部 工学科（応用数理研究室）\par}
-  \vskip0.2em
-  {\small 2026年\quad 卒業論文発表会}% ← 発表日は適宜変更してください
+  {\color{sub}\normalsize 金価格の時系列予測への応用とモデルの限界\par}
+  \vskip1.2em
+  {\color{hair}\rule{0.46\textwidth}{0.4pt}}\par
+  \vskip1.4em
+  {\normalsize 2520148K\quad 北村 慎悟\par}
+  \vskip0.7em
+  {\color{sub}\small 指導教員\quad 安藤 和典 教授\quad ・\quad 森岡 悠 准教授\par}
+  \vskip0.45em
+  {\color{sub}\small 愛媛大学 工学部 工学科（応用数理研究室）\quad/\quad 2026年\par}% ← 発表日は適宜変更
   \vfill
 \end{frame}
 \note{% 【約12秒】
@@ -143,15 +146,15 @@
   \begin{block}{背景}
     \begin{itemize}
       \item 金（XAUUSD）はインフレや地政学的リスクを映す重要資産であり，値動きのモデル化への関心は高い
-      \item \alert{相関付きランダムウォーク}\dots 直前の値動きの向きに応じて次の向きを確率的に決めるモデル。\alert{持続性・反転傾向を少数のパラメータで表現}できる
-      \item Konno (2019) の\alert{量子ウォークによる時系列モデル}を，相関付きランダムウォークへ応用したもの
+      \item \alert{相関付きランダムウォーク}\dots 直前の値動きの向きに応じて次の向きを確率的に決めるモデル。持続性・反転傾向を少数のパラメータで表現できる
+      \item Konno (2019) の量子ウォークによる時系列モデルを，相関付きランダムウォークへ応用したもの
       \item 金価格への適用は，筆者の知る限り先行研究が存在しない
     \end{itemize}
   \end{block}
   \begin{block}{目的}
     \begin{itemize}
       \item 金価格 XAUUSD を\alert{平均練行足}で $\pm1$ の系列へ離散化し，本モデルで次時刻を予測
-      \item 予測と実測の\alert{重ね描き}と\alert{平均絶対誤差 (MAE)}により，記述の\alert{妥当性と限界}を実証的に検討
+      \item 予測と実測の重ね描きと平均絶対誤差 (MAE) により，記述の\alert{妥当性と限界}を実証的に検討
     \end{itemize}
   \end{block}
 \end{frame}
@@ -333,13 +336,13 @@ $n=3$ を見ます。鍵は経路和 $\Xi$ です。これは $P$ を $l$ 個，
       \centering
       \resizebox{\linewidth}{!}{%
       \begin{tikzpicture}[x=0.60cm,y=0.50cm,line join=round]
-        \draw[->,gray] (-0.2,0)--(10.7,0) node[right,black]{\footnotesize $n$};
-        \draw[->,gray] (0,-1.3)--(0,4.7) node[above,black]{\footnotesize $x_n$};
-        \foreach \y in {1,2,3,4} \draw[gray!25,very thin] (0,\y)--(10.3,\y);
-        \draw[very thick,myblue]
+        \draw[->,sub] (-0.2,0)--(10.7,0) node[right,black]{\footnotesize $n$};
+        \draw[->,sub] (0,-1.3)--(0,4.7) node[above,black]{\footnotesize $x_n$};
+        \foreach \y in {1,2,3,4} \draw[hair,very thin] (0,\y)--(10.3,\y);
+        \draw[thick,accent]
           (0,0)--(1,1)--(2,2)--(3,1)--(4,2)--(5,3)--(6,4)--(7,3)--(8,2)--(9,3)--(10,4);
         \foreach \x/\y in {0/0,1/1,2/2,3/1,4/2,5/3,6/4,7/3,8/2,9/3,10/4}
-          \fill[mygold] (\x,\y) circle (1.7pt);
+          \fill[accent] (\x,\y) circle (1.5pt);
       \end{tikzpicture}}
       \par\vskip0.4em{\footnotesize\color{mygray}$\pm1$ を積み上げた整数時系列 $x_n$ の例}
     \end{column}
@@ -430,12 +433,11 @@ $n=3$ を見ます。鍵は経路和 $\Xi$ です。これは $P$ を $l$ 個，
 % =====================  謝辞・結び  ===============================
 \begin{frame}[plain]
   \centering\vfill
-  {\color{mygold}\rule{0.6\textwidth}{2pt}}\par\vskip1.2em
-  {\usebeamercolor[fg]{title}\Large\bfseries ご清聴ありがとうございました}\par
-  \vskip1.0em
-  {\color{mygray}\small 相関付きランダムウォークモデルを用いた時系列解析\\[2pt]2520148K\quad 北村 慎悟}\par
-  \vskip1.0em
-  {\color{mygold}\rule{0.6\textwidth}{2pt}}
+  {\usebeamercolor[fg]{title}\Large ご清聴ありがとうございました}\par
+  \vskip1.1em
+  {\color{hair}\rule{0.30\textwidth}{0.4pt}}\par
+  \vskip1.1em
+  {\color{sub}\small 相関付きランダムウォークモデルを用いた時系列解析\\[3pt]2520148K\quad 北村 慎悟}\par
   \vfill
 \end{frame}
 \note{% 【約8秒】
