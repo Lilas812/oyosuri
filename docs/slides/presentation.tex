@@ -312,23 +312,11 @@
 % =====================  5. 離散化  ================================
 \begin{frame}[t]{金価格データの離散化：平均練行足}
   \small
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.49\textwidth}
-      \centering
-      {\color{myblue}\bfseries 変換前：価格系列 $P_t$}\par
-      \vskip0.25em
-      \safeincludegraphics[width=\linewidth,height=31mm,keepaspectratio]{figures/gold-price-before}
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \centering
-      {\color{myblue}\bfseries 変換後：平均練行足 $x_n$}\par
-      \vskip0.25em
-      \safeincludegraphics[width=\linewidth,height=31mm,keepaspectratio]{figures/mean-renko-after}
-    \end{column}
-  \end{columns}
-  \vskip-0.05em
-  \centering{\scriptsize\color{sub}価格系列から平均練行足への変換例}\par
-  \vskip0pt
+  \centering
+  \safeincludegraphics[width=0.96\linewidth,height=38mm,keepaspectratio]{figures/linechart_renko_compare}
+  \par\vskip0.05em
+  {\scriptsize\color{sub}変換例（左：変換前の価格系列，右：変換後の平均練行足）}\par
+  \vskip-0.1em
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.62\textwidth}
       {\color{myblue}\bfseries 変換規則}
@@ -350,7 +338,7 @@
 \end{frame}
 \note{% 【約45秒】
 実際の金価格は連続的に変動するので，そのままではモデルに入れられません。左が変換前の価格系列，右が変換後の平均練行足です。基準価格から $B$ 以上上がればプラス1の足，下がればマイナス1の足とし，価格が $B$ 動くごとに1本生成します。こうして得た符号を累積すると，ボックス単位の整数時系列 $x_n$ になります。主実験ではXAUUSDの1分足317本に対して $B=3$ ドルとし，156本の平均練行足を得ました。この離散系列をモデルの入力として使います。
-\sourceblock{docs/thesis/main.tex, 第6章「解析手法」。差し替え図は figures/gold-price-before および figures/mean-renko-after。src/oyosuri/renko.py。}%
+\sourceblock{docs/thesis/main.tex, 第6章「解析手法」。図は figures/linechart\_renko\_compare.png。src/oyosuri/renko.py。}%
 }
 
 % =================  6. 実験：全期間の失敗と参照期間W  =============
