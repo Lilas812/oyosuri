@@ -232,6 +232,7 @@
         \item 時刻 $n$・位置 $x$ の確率ベクトルと初期値
           \[ \Psi_n(x)=\begin{pmatrix}\Psi_n^{L}(x)\\[1pt]\Psi_n^{R}(x)\end{pmatrix},\ \
              \Psi_0(0)=\varphi=\begin{pmatrix}\alpha\\\beta\end{pmatrix} \]
+          \[ \alpha+\beta=1,\qquad \alpha,\beta\geq0 \]
         \item 発展則（$P$ が左へ，$Q$ が右へ運ぶ）
           \[ \Psi_{n+1}(x)=P\,\Psi_n(x{+}1)+Q\,\Psi_n(x{-}1) \]
         \item 位置の確率は成分の和
@@ -241,7 +242,7 @@
   \end{columns}
 \end{frame}
 \note{% 【約45秒】
-相関付きランダムウォークです。直前が左なら次に左へ行く確率を $a$，右なら右へ行く確率を $d$ などと定め，コイン行列 $A$ にまとめます。ここが本質で，$A$ を左へ動かす成分 $P$ と右へ動かす成分 $Q$ に分解します。すると，時刻 $n$・位置 $x$ の状態を確率ベクトル $\Psi$ で表し，$P$ と $Q$ を掛けながら1歩ずつ時間発展させることで分布が計算できます。位置の確率は，そのベクトルの成分の和です。
+相関付きランダムウォークです。直前が左なら次に左へ行く確率を $a$，右なら右へ行く確率を $d$ などと定め，コイン行列 $A$ にまとめます。ここが本質で，$A$ を左へ動かす成分 $P$ と右へ動かす成分 $Q$ に分解します。初期ベクトルの $\alpha$ と $\beta$ は左右それぞれの初期確率なので，和は1です。すると，時刻 $n$・位置 $x$ の状態を確率ベクトル $\Psi$ で表し，$P$ と $Q$ を掛けながら1歩ずつ時間発展させることで分布が計算できます。位置の確率は，そのベクトルの成分の和です。
 \sourceblock{docs/thesis/main.tex, 第4章「相関付きランダムウォークについて」。}%
 }
 
@@ -278,7 +279,16 @@
   観測時系列 $x_0,\dots,x_n$（増分 $\pm1$，$x_0{=}0$）に対し，パラメータ
   $(p,q,\alpha)$ を推定して次時刻を予測する。
   \par{\footnotesize\color{mygray}$p,q$：左右の継続確率，$\alpha$：初期が左向きの確率}
-  \vskip0.4em
+  \vskip0.1em
+  \centering{\color{myblue}\bfseries 実験で用いるコイン行列}\par
+  \vskip-0.4em
+  {\footnotesize
+  \[
+    A(p,q)=\begin{pmatrix}q&1-p\\1-q&p\end{pmatrix},
+    \qquad
+    \varphi(\alpha)=\begin{pmatrix}\alpha\\1-\alpha\end{pmatrix}
+  \]}
+  \vskip-0.4em
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
       {\color{myblue}\bfseries ① モデル分布とのズレを測る}
@@ -305,7 +315,7 @@
   \centering{\footnotesize\color{mygray}以上を各 $n$ で繰り返し，予測列 $x_1^{\ast},\dots,x_N^{\ast}$ を得る}
 \end{frame}
 \note{% 【約55秒】
-では，この分布をどう時系列予測に使うかです。観測した増分プラスマイナス1の系列に対し，パラメータ $p$，$q$，$\alpha$ を推定します。左の $\mu$ が，先ほどの発展則を必要な時刻まで繰り返して求めるモデルの分布です。各時刻で，観測値 $x_t$ と，モデルが取りうる位置 $x$ の二乗誤差を，確率 $\mu$ で重み付けして足したものが評価関数 $V_n$ です。この評価関数が最小となるパラメータを決め，そのパラメータから得られる次時刻の期待値を予測値とします。これを各時刻で繰り返して，予測列を得ます。
+では，この分布をどう時系列予測に使うかです。実験では，先ほどの $a,b,c,d$ を $p,q$ で表し，コイン行列を $A(p,q)$，初期ベクトルを $\alpha$ と $1-\alpha$ で定めます。観測した増分プラスマイナス1の系列から，$p$，$q$，$\alpha$ を推定します。左の $\mu$ は，発展則で求めるモデルの分布です。評価関数 $V_n$ は，観測値 $x_t$ とモデルが取りうる位置 $x$ の二乗誤差を，確率 $\mu$ で重み付けしたものです。これが最小となるパラメータを決め，次時刻の期待値を予測値とします。この計算を各時刻で繰り返して，予測列を得ます。
 \sourceblock{docs/thesis/main.tex, 第5章「時系列モデル」。src/oyosuri/model.py・optimize.py・predict.py。}%
 }
 
