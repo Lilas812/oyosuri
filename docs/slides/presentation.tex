@@ -215,29 +215,27 @@
 \begin{frame}[t]{確率分布で見る通常のランダムウォークとの違い}
   \small
   \centering
-  \safeincludegraphics[width=\linewidth]{figures/dist_compare_rw_crw}
-  \par\vskip0.15em
-  {\scriptsize\color{sub}時間発展対称な場合（$a{=}d$，$\varphi{=}(1/2,1/2)^{\top}$）の
-  厳密な分布 $P(\tilde S_n{=}x)$。$a{=}1/2$ は通常のランダムウォーク（二項分布）に一致}
-  \vskip0.3em
+  \safeincludegraphics[width=0.80\linewidth,height=0.645\textheight,keepaspectratio]{figures/crw_hist_n100}
+  \par\vskip0.1em
+  {\scriptsize\color{sub}時間発展対称な場合（$a{=}d$，$\varphi{=}(1/2,1/2)^{\top}$）の分布を
+  $u{=}\tilde S_n/\sqrt{n}$ に再スケール。破線 $N(0,1)$ は\alert{通常のランダムウォークの極限}（極限分散 $\sigma^{2}{=}a/(1-a)$）}
+  \vskip0.15em
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.52\textwidth}
+    \begin{column}{0.50\textwidth}
       \begin{itemize}\footnotesize
-        \item 1歩あたり上下に動く確率は\alert{どれも $1/2$ で同じ}
-          \\ 違うのは\alert{直前の向きとの相関}だけ
+        \item 1歩の上下の確率は\alert{どれも $1/2$}。違いは\alert{相関}だけ
       \end{itemize}
     \end{column}
-    \begin{column}{0.46\textwidth}
+    \begin{column}{0.48\textwidth}
       \begin{itemize}\footnotesize
-        \item 持続性 $a{>}1/2$：\alert{裾が広い}（$\sigma^{2}{=}\tfrac{a}{1-a}{>}1$）
-          \\ 反転傾向 $a{<}1/2$：\alert{原点に集中}（$\sigma^{2}{<}1$）
+        \item 持続性：\alert{裾が広い}／反転傾向：\alert{原点に集中}
       \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
 \note{% 【約45秒】
-この相関が分布にどう効くかを見ます。図は，時刻 $n$ で位置 $x$ にいる確率です。三つとも1歩あたり上下に動く確率は2分の1で同じで，違うのは直前の向きとの相関だけです。破線が相関のない通常のランダムウォークで，これは二項分布に一致します。同じ向きが続きやすい持続性の場合は，一方向に長く進むので分布は横に広がり，反転傾向の場合は行ったり来たりするので原点付近に集中します。再スケールした分散は $a/(1-a)$ で，通常の1に対し，$a$ が3分の2なら2，3分の1なら0.5です。1歩ごとの確率が同じでも，相関を入れるだけで分布の形が変わる。これが，持続性や反転傾向を表現できる理由です。
-\sourceblock{docs/thesis/main.tex, 第4章「相関付きランダムウォークについて」（弱収束極限定理と分布の比較）。図は colab/make\_slide\_figs.py で生成。}%
+この相関が分布にどう効くかを見ます。図は，時刻 $n$ が100のときの位置の分布を，$\sqrt{n}$ で割って再スケールしたものです。どちらも1歩あたり上下に動く確率は2分の1で同じで，違うのは直前の向きとの相関だけです。破線は標準正規分布で，これが相関のない通常のランダムウォークの極限にあたります。同じ向きが続きやすい持続性の場合は，一方向に長く進むので分布は破線より横に広がり，反転傾向の場合は行ったり来たりするので原点付近に集中します。実際，極限の分散は $a/(1-a)$ で，通常の1に対し，$a$ が3分の2なら2，3分の1なら0.5です。1歩ごとの確率が同じでも，相関を入れるだけで分布の形が変わる。これが，持続性や反転傾向を表現できる理由です。
+\sourceblock{docs/thesis/main.tex, 第4章「相関付きランダムウォークについて」（弱収束極限定理と分布の比較）。図は docs/thesis/crw\_hist\_n100.png（colab/oyosuri\_limit\_figs.py で生成）。}%
 }
 
 % =================  5. 予測モデル（評価関数・当てはめ）  ==========
@@ -354,8 +352,9 @@
   \]}
   \vskip-0.6em
   \centering
-  \safeincludegraphics[width=0.82\linewidth]{figures/w_sweep_summary}
-  \par{\scriptsize\color{sub}参照期間 $W$ に対する MAE（左，破線は基準 $\mathrm{MAE}{=}1$）と1ステップ当たり計算時間（右）}
+  \safeincludegraphics[width=0.86\linewidth,height=0.46\textheight,keepaspectratio]{figures/w_sweep_summary}
+  \par{\scriptsize\color{sub}参照期間 $W$ に対する MAE（左，破線は基準 $\mathrm{MAE}{=}1$）と1ステップ当たり計算時間（右）。
+  全期間参照は $\mathrm{MAE}{=}5.94$（前ページ）}
   \vskip0.15em
   \begin{itemize}\footnotesize
     \item $W$ を小さくすると\alert{MAE・計算時間がともに減少}（トレードオフなし）
