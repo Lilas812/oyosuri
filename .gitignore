@@ -37,4 +37,6 @@ htmlcov/
 *.vrb
 docs/**/*.log
 # コンパイル生成物（.tex と figures/ のみ管理する方針）
-docs/slides/presentation.pdf
+# presentation.pdf のほか，show notes を有効にしてビルドした
+# presentation-notes.pdf などの派生 PDF も対象にする。
+docs/slides/*.pdf
