@@ -187,9 +187,16 @@
       \end{itemize}
       \vskip0.3em
       コイン行列と\alert{左右移動への分解}
-      \[ A=\begin{pmatrix}a&b\\c&d\end{pmatrix}
-         =\underbrace{\begin{pmatrix}a&b\\0&0\end{pmatrix}}_{P\ (\text{左移動})}
-          +\underbrace{\begin{pmatrix}0&0\\c&d\end{pmatrix}}_{Q\ (\text{右移動})} \]
+      % 1行に並べると列幅（0.49\textwidth）を超えてスライド外へはみ出すため，
+      % 2行に分けて footnotesize で組む。
+      {\footnotesize
+      \[
+        \begin{aligned}
+          A&=\begin{pmatrix}a&b\\c&d\end{pmatrix}=P+Q,\\[2pt]
+          P&=\underbrace{\begin{pmatrix}a&b\\0&0\end{pmatrix}}_{\text{左移動}},\quad
+          Q=\underbrace{\begin{pmatrix}0&0\\c&d\end{pmatrix}}_{\text{右移動}}
+        \end{aligned}
+      \]}
     \end{column}
     \begin{column}{0.49\textwidth}
       {\color{myblue}\bfseries 確率ベクトルの時間発展}
