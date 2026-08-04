@@ -18,16 +18,16 @@
 %    画像が見つからない場合も \safeincludegraphics がプレースホルダを
 %    表示するため，コンパイルは止まりません。
 %
-%  --- 発表者ノート ----------------------------------------------------
+%  --- 発表者ノート（Pympress用）---------------------------------------
 %    各フレーム直後の \note{...} が発表原稿です。合計の目安は約7分。
-%      ・スライドのみ         : 既定（このまま）
-%      ・ノートページ付き     : 下の \setbeameroption{show notes} を有効化
-%      ・発表者ビュー(左右)   : show notes on second screen=right を有効化
+%    このファイルは，左半分にスライド，右半分にノートを配置した
+%    Pympress対応PDFを出力する設定です。
+%    Pympressが自動認識しない場合：pympress -n right presentation.pdf
 %
-%  --- おおよその時間配分（本編の合計 約5分55秒。原稿量からの目安）
-%    表紙 15s / 背景 40s / 相関RW(定義・行列) 35s / 分布の比較 30s /
-%    予測モデル 30s / 離散化 30s / 実験(全期間) 50s / 改良(参照期間W) 35s /
-%    限界 50s / まとめ 35s / 謝辞 5s（付録は本編の時間に含めない）
+%  --- おおよその時間配分（本編の合計 約6分35秒）
+%    表紙 15s / 背景 50s / 相関RW(定義・行列) 40s / 分布の比較 35s /
+%    予測モデル 30s / 離散化 35s / 実験(全期間) 50s / 改良(参照期間W) 45s /
+%    限界 55s / まとめ 35s / 謝辞 5s（付録は本編の時間に含めない）
 %    ・通常のランダムウォークの定義スライドは時間短縮のため省略し，
 %      相関付きRWとの違いは「確率分布の比較」1枚で見せる。
 %    ・相関付きRWの行列計算（n=1,2）は付録（最終ページ）へ回し，
@@ -41,15 +41,16 @@
 
 \usepackage{amsmath,amssymb}
 \usepackage{tikz}
+\usepackage{pgfpages}
 
 % 日本語をゴシック体（サンセリフ相当）に統一
 \ifdefined\kanjifamilydefault
   \renewcommand{\kanjifamilydefault}{\gtdefault}
 \fi
 
-% ---- 発表者ノートの表示切り替え（必要に応じてコメントを外す）--------
+% ---- 発表者ノート：Pympress用の左右分割PDFを出力 ---------------------
 %\setbeameroption{show notes}
-%\setbeameroption{show notes on second screen=right}
+\setbeameroption{show notes on second screen=right}
 
 % ==============  配色・デザイン（落ち着いたモノトーン）  =============
 % ほぼ黒＋くすんだ濃紺の一色のみ。装飾は細いグレー罫線に限定する。
